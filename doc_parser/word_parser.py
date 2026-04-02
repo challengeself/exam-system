@@ -1,6 +1,6 @@
 """Word 题库解析器"""
 import re
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from docx import Document
 from .question_model import Question, QuestionType, SingleChoiceQuestion, CaseAnalysisQuestion
 
@@ -76,8 +76,170 @@ def parse_single_choice(lines: List[str], start_idx: int) -> Tuple[SingleChoiceQ
     ), i
 
 
+def parse_case_analysis_new(lines: List[str], start_idx: int) -> Tuple[CaseAnalysisQuestion, int]:
+    """
+    解析新格式的案例分析题
+    格式：
+    案例一
+    案例描述内容...
+    单选/多选
+    1. 题目内容（）
+    选项：A. xxx B. xxx C. xxx D. xxx
+    答案：xxx
+    分析：xxx
+    """
+    question_id = f"case_{start_idx}"
+    case_background = ""
+    sub_questions = []
+    sub_answers = []
+    all_keywords = []
+    
+    i = start_idx
+    current_field = "background"  # background, question_type, question, options, answer, analysis
+    question_type = ""  # 单选/多选
+    current_question = ""
+    current_options = []
+    current_answer = ""
+    current_analysis = ""
+    
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        if not line:
+            i += 1
+            continue
+        
+        # 检测新案例开始
+        if line.startswith("案例") and i == start_idx:
+            # 第一个案例标题行，下一行是描述
+            case_background = ""
+            current_field = "background"
+            i += 1
+            continue
+        
+        # 检测题型标记
+        if line in ["单选", "多选"]:
+            # 保存之前的子问题（如果有）
+            if current_question and current_answer:
+                sub_questions.append({
+                    "content": current_question,
+                    "type": question_type,
+                    "options": current_options,
+                    "answer": current_answer,
+                    "analysis": current_analysis
+                })
+            
+            question_type = line
+            current_field = "question"
+            current_question = ""
+            current_options = []
+            current_answer = ""
+            current_analysis = ""
+            i += 1
+            continue
+        
+        # 检测题目（数字开头）
+        if re.match(r'^[\d]+[.．]', line) and current_field in ["question", "background"]:
+            # 保存之前的子问题（如果有）
+            if current_question and current_answer:
+                sub_questions.append({
+                    "content": current_question,
+                    "type": question_type,
+                    "options": current_options,
+                    "answer": current_answer,
+                    "analysis": current_analysis
+                })
+                current_question = ""
+                current_options = []
+                current_answer = ""
+                current_analysis = ""
+            
+            # 如果是背景描述阶段，切换到题目阶段
+            if current_field == "background":
+                current_field = "question"
+            
+            current_question = re.sub(r'^[\d]+[.．]\s*', '', line).strip()
+            i += 1
+            continue
+        
+        # 检测选项
+        if line.startswith("选项：") or (line.startswith("选项") and "：" in line):
+            options_str = line.replace("选项：", "").replace("选项:", "").strip()
+            current_options = []
+            # 解析选项 A. B. C. D.
+            for opt in ['A', 'B', 'C', 'D']:
+                opt_match = re.search(rf'{opt}\.([^A-D]+?)(?={chr(ord(opt)+1)}\.|$)', options_str)
+                if opt_match:
+                    current_options.append(f"{opt}. {opt_match.group(1).strip()}")
+            current_field = "options"
+            i += 1
+            continue
+        
+        # 检测答案
+        if line.startswith("答案：") or (line.startswith("答案") and "：" in line):
+            current_answer = line.replace("答案：", "").replace("答案:", "").strip()
+            current_field = "answer"
+            i += 1
+            continue
+        
+        # 检测分析
+        if line.startswith("分析：") or (line.startswith("分析") and "：" in line):
+            current_analysis = line.replace("分析：", "").replace("分析:", "").strip()
+            current_field = "analysis"
+            i += 1
+            continue
+        
+        # 处理各字段内容
+        if current_field == "background":
+            # 案例描述内容
+            if case_background:
+                case_background += " " + line
+            else:
+                case_background = line
+        
+        elif current_field == "analysis" and current_analysis:
+            current_analysis += " " + line
+        
+        i += 1
+    
+    # 保存最后一个子问题
+    if current_question and current_answer:
+        sub_questions.append({
+            "content": current_question,
+            "type": question_type,
+            "options": current_options,
+            "answer": current_answer,
+            "analysis": current_analysis
+        })
+    
+    # 提取关键词
+    all_text = " ".join([sq.get("analysis", "") for sq in sub_questions])
+    all_keywords = extract_keywords(all_text)
+    
+    # 构建案例题内容
+    content = f"【案例】{case_background}"
+    
+    # 构建答案和解析
+    full_answer = ""
+    full_analysis = ""
+    for sq in sub_questions:
+        full_answer += f"[{sq['type']}] {sq['content']} 答案：{sq['answer']}\n"
+        full_analysis += f"[{sq['type']}] {sq['content']}\n答案：{sq['answer']}\n分析：{sq['analysis']}\n\n"
+    
+    return CaseAnalysisQuestion(
+        id=question_id,
+        type=QuestionType.CASE_ANALYSIS,
+        content=content,
+        answer=full_answer.strip(),
+        analysis=full_analysis.strip(),
+        keywords=all_keywords,
+        case_background=case_background,
+        sub_questions=[sq["content"] for sq in sub_questions]
+    ), i
+
+
 def parse_case_analysis(lines: List[str], start_idx: int) -> Tuple[CaseAnalysisQuestion, int]:
-    """解析案例分析题"""
+    """解析案例分析题（兼容旧格式）"""
     question_id = f"case_{start_idx}"
     case_content = ""
     case_background = ""
@@ -205,7 +367,19 @@ def parse_word_document(file_path: str) -> List[Question]:
                 i += 1
                 continue
         
-        # 检测案例分析题
+        # 检测案例分析题（新格式：案例 + 单选/多选）
+        if line.startswith("案例") and not ("案例：" in line or "案例:" in line):
+            try:
+                q, next_i = parse_case_analysis_new(lines, i)
+                questions.append(q)
+                i = next_i
+                continue
+            except Exception as e:
+                print(f"解析新格式案例题失败 {i}: {e}")
+                i += 1
+                continue
+        
+        # 检测案例分析题（旧格式）
         if line.startswith("案例") and ("案例：" in line or "案例:" in line):
             try:
                 q, next_i = parse_case_analysis(lines, i)
@@ -213,7 +387,7 @@ def parse_word_document(file_path: str) -> List[Question]:
                 i = next_i
                 continue
             except Exception as e:
-                print(f"解析案例题失败 {i}: {e}")
+                print(f"解析旧格式案例题失败 {i}: {e}")
                 i += 1
                 continue
         

@@ -373,10 +373,16 @@ elif st.session_state.mode == "practice":
                     st.rerun()
         
         elif question["type"] == "case_analysis":
-            sub_questions = question.get("sub_questions", [])
+            # 显示案例背景
+            case_background = question.get("case_background", "")
+            if case_background:
+                st.markdown(f"**【案例描述】**\n\n{case_background}")
+                st.markdown("---")
             
+            # 显示子问题列表
+            sub_questions = question.get("sub_questions", [])
             if sub_questions:
-                st.markdown("**问题：**")
+                st.markdown("**【问题】**")
                 for i, sq in enumerate(sub_questions, 1):
                     st.write(f"{i}. {sq}")
             
