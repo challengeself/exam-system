@@ -168,9 +168,11 @@ if st.session_state.mode == "import":
                         questions = parse_word_document(file_path)
                         
                         if questions:
+                            # 去掉扩展名获取文件名
+                            file_name_no_ext = os.path.splitext(uploaded_file.name)[0]
                             for q in questions:
                                 q_dict = {
-                                    "id": f"{uploaded_file.stem}_{q.id}",
+                                    "id": f"{file_name_no_ext}_{q.id}",
                                     "source_file": uploaded_file.name,
                                     "type": q.type.value,
                                     "content": q.content,
