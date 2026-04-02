@@ -285,63 +285,49 @@ elif st.session_state.mode == "practice":
     progress = (current + 1) / total if total > 0 else 0
     st.progress(progress)
     
-    # 题目概览 - 右上角小面板
+    # 题目概览 - 右上角悬浮面板
+    st.markdown("""
+    <style>
+    .question-panel {
+        position: fixed;
+        top: 100px;
+        right: 20px;
+        width: 220px;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        z-index: 999;
+    }
+    .question-grid {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 5px;
+    }
+    .question-btn {
+        width: 100%;
+        min-width: 18px;
+        height: 28px;
+        font-size: 12px;
+        padding: 2px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # 主答题区域
     with st.container():
-        overview_col, main_col = st.columns([1, 4])
+        st.write(f"#### 第 {current + 1} / {total} 题")
         
-        with overview_col:
-            with st.container():
-                st.markdown("### 📋 题目")
-                
-                # 统计答题情况
-                answered_count = len(st.session_state.answers)
-                correct_count = sum(1 for a in st.session_state.answers.values() if a.get("is_correct", False))
-                
-                st.metric("已答", f"{answered_count}/{total}")
-                st.metric("正确", correct_count)
-                
-                st.markdown("---")
-                
-                # 题目列表 - 紧凑按钮
-                for i, q in enumerate(st.session_state.questions):
-                    q_id = q["id"]
-                    is_answered = q_id in st.session_state.answers
-                    is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
-                    is_current = i == current
-                    
-                    # 按钮样式
-                    if is_current:
-                        btn_type = "primary"
-                    elif is_correct:
-                        btn_type = "success"
-                    elif is_answered:
-                        btn_type = "secondary"
-                    else:
-                        btn_type = "secondary"
-                    
-                    # 题目类型图标
-                    icon = "▢" if q["type"] == "single_choice" else "◫"
-                    
-                    if st.button(
-                        f"{icon}{i+1}",
-                        key=f"nav_{i}",
-                        type=btn_type,
-                        use_container_width=True,
-                        help=st.session_state.answers.get(q_id, {}).get("is_correct", False) and "✓" or ""
-                    ):
-                        st.session_state.current_index = i
-                        st.session_state.show_result = False
-                        st.rerun()
-                
-                st.markdown("---")
-                
-                # 快捷操作
-                if st.button("🔁 从头开始", use_container_width=True, key="restart_practice"):
-                    st.session_state.current_index = 0
-                    st.session_state.show_result = False
-                    st.rerun()
+        # 统计信息（小字显示）
+        answered_count = len(st.session_state.answers)
+        correct_count = sum(1 for a in st.session_state.answers.values() if a.get("is_correct", False))
+        st.caption(f"📊 已答：{answered_count}/{total} | 正确：{correct_count}")
         
-        with main_col:
+        # 获取当前题目
+        question = st.session_state.questions[current]
+        
+        # 显示题目
             st.write(f"#### 第 {current + 1} / {total} 题")
             
             # 获取当前题目
@@ -482,6 +468,65 @@ elif st.session_state.mode == "practice":
                         st.session_state.current_index = 0
                         st.session_state.show_result = False
                         st.rerun()
+    
+    # 悬浮题目面板 - 右上角固定位置
+    with st.container():
+        st.markdown('<div class="question-panel">', unsafe_allow_html=True)
+        st.markdown("**📋 题目**")
+        
+        # 10x10 网格排列题目按钮
+        cols_per_row = 10
+        total_rows = (total + cols_per_row - 1) // cols_per_row
+        
+        for row in range(total_rows):
+            cols = st.columns(cols_per_row)
+            start_idx = row * cols_per_row
+            end_idx = min(start_idx + cols_per_row, total)
+            
+            for col_idx, i in enumerate(range(start_idx, end_idx)):
+                with cols[col_idx]:
+                    q_id = st.session_state.questions[i]["id"]
+                    is_answered = q_id in st.session_state.answers
+                    is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
+                    is_current = i == current
+                    
+                    # 按钮样式
+                    if is_current:
+                        btn_type = "primary"
+                    elif is_correct:
+                        btn_type = "secondary"
+                    else:
+                        btn_type = "secondary"
+                    
+                    # 按钮标签
+                    btn_label = f"{i+1}"
+                    btn_help = ""
+                    if is_correct:
+                        btn_label = f"✅"
+                        btn_help = "答对了"
+                    elif is_answered:
+                        btn_help = "已答"
+                    
+                    if st.button(
+                        btn_label,
+                        key=f"nav_{i}",
+                        type=btn_type,
+                        use_container_width=True,
+                        help=btn_help
+                    ):
+                        st.session_state.current_index = i
+                        st.session_state.show_result = False
+                        st.rerun()
+        
+        st.markdown("---")
+        
+        # 快捷操作
+        if st.button("🔁 从头开始", use_container_width=True, key="restart_practice"):
+            st.session_state.current_index = 0
+            st.session_state.show_result = False
+            st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============== 页面：错题集 ==============
