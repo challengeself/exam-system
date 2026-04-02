@@ -81,21 +81,25 @@ def parse_case_analysis_new(lines: List[str], start_idx: int) -> Tuple[CaseAnaly
     解析新格式的案例分析题
     格式：
     案例一
-    案例描述内容...
-    单选/多选
+    案例描述
+    内容...
+    单选
     1. 题目内容（）
     选项：A. xxx B. xxx C. xxx D. xxx
     答案：xxx
     分析：xxx
+    2. 题目内容（）
+    ...
+    多选
+    1. 题目内容（）
+    ...
     """
     question_id = f"case_{start_idx}"
     case_background = ""
     sub_questions = []
-    sub_answers = []
-    all_keywords = []
     
     i = start_idx
-    current_field = "background"  # background, question_type, question, options, answer, analysis
+    current_field = "background"  # background, question, options, answer, analysis
     question_type = ""  # 单选/多选
     current_question = ""
     current_options = []
@@ -109,10 +113,17 @@ def parse_case_analysis_new(lines: List[str], start_idx: int) -> Tuple[CaseAnaly
             i += 1
             continue
         
-        # 检测新案例开始
-        if line.startswith("案例") and i == start_idx:
-            # 第一个案例标题行，下一行是描述
-            case_background = ""
+        # 检测新案例开始（遇到下一个案例就结束当前案例）
+        # 简单判断：以"案例"开头且包含数字或中文数字，且不是"案例描述"
+        if line.startswith('案例') and line != '案例描述' and any(c in line for c in '0123456789 一二三四五六七八九十'):
+            if case_background:  # 已经有内容了，说明是下一个案例
+                break
+            # 第一个案例标题，继续
+            i += 1
+            continue
+        
+        # 跳过"案例描述"标题行
+        if line == "案例描述":
             current_field = "background"
             i += 1
             continue
@@ -139,7 +150,7 @@ def parse_case_analysis_new(lines: List[str], start_idx: int) -> Tuple[CaseAnaly
             continue
         
         # 检测题目（数字开头）
-        if re.match(r'^[\d]+[.．]', line) and current_field in ["question", "background"]:
+        if re.match(r'^[\d]+[.．]', line):
             # 保存之前的子问题（如果有）
             if current_question and current_answer:
                 sub_questions.append({
@@ -154,11 +165,8 @@ def parse_case_analysis_new(lines: List[str], start_idx: int) -> Tuple[CaseAnaly
                 current_answer = ""
                 current_analysis = ""
             
-            # 如果是背景描述阶段，切换到题目阶段
-            if current_field == "background":
-                current_field = "question"
-            
             current_question = re.sub(r'^[\d]+[.．]\s*', '', line).strip()
+            current_field = "question"
             i += 1
             continue
         
