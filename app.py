@@ -38,6 +38,8 @@ if "practice_from_wrong" not in st.session_state:
     st.session_state.practice_from_wrong = False
 if "wrong_practice_questions" not in st.session_state:
     st.session_state.wrong_practice_questions = []
+if "page_refreshed" not in st.session_state:
+    st.session_state.page_refreshed = False
 
 
 # ============== 辅助函数 ==============
@@ -139,7 +141,7 @@ if st.session_state.mode == "import":
     tab1, tab2 = st.tabs(["📤 上传新题库", "📂 选择已保存题库"])
     
     with tab1:
-        st.markdown("支持上传多个 Word 文档格式（.docx）")
+        st.markdown("支持上传多个 Word 文档格式（.docx），上传后自动保存到本地")
         
         uploaded_files = st.file_uploader(
             "上传 Word 题库文件（可多选）",
@@ -149,9 +151,9 @@ if st.session_state.mode == "import":
         )
         
         library_name = st.text_input(
-            "题库名称",
+            "题库名称（可选）",
             placeholder="例如：2026 年模拟题库",
-            help="给这个题库起个名字，方便下次选择"
+            help="给这个题库起个名字，方便下次选择。不填写则使用文件名"
         )
         
         if uploaded_files:
@@ -200,19 +202,22 @@ if st.session_state.mode == "import":
             if all_questions:
                 st.success(f"🎉 共解析 {len(all_questions)} 道题目！")
                 
-                if library_name and st.button("💾 保存题库"):
-                    save_library(library_name, all_questions)
-                    st.session_state.questions = all_questions
-                    st.session_state.current_library = library_name
-                    reset_practice_state()
-                    st.success(f"✅ 题库 '{library_name}' 已保存并加载！")
+                # 自动保存题库
+                auto_library_name = library_name or os.path.splitext(uploaded_files[0].name)[0]
+                save_library(auto_library_name, all_questions)
+                st.session_state.questions = all_questions
+                st.session_state.current_library = auto_library_name
+                reset_practice_state()
+                st.success(f"✅ 题库 '{auto_library_name}' 已自动保存到本地并加载！")
                 
-                if st.button("🚀 直接开始答题"):
-                    st.session_state.questions = all_questions
-                    st.session_state.current_library = library_name or "临时题库"
-                    reset_practice_state()
-                    st.session_state.mode = "practice"
-                    st.rerun()
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🚀 开始答题", type="primary", use_container_width=True):
+                        st.session_state.mode = "practice"
+                        st.rerun()
+                with col2:
+                    if st.button("📋 查看题目预览", use_container_width=True):
+                        st.rerun()
                 
                 # 题目预览
                 with st.expander("📋 题目预览", expanded=False):
@@ -227,7 +232,7 @@ if st.session_state.mode == "import":
         libraries = get_saved_libraries()
         
         if not libraries:
-            st.info("📭 还没有保存的题库，请先上传并保存题库")
+            st.info("📭 还没有保存的题库，请先上传题库")
         else:
             for lib in libraries:
                 with st.container():
@@ -236,7 +241,7 @@ if st.session_state.mode == "import":
                         st.write(f"**📚 {lib['name']}**")
                         st.caption(f"共 {lib['question_count']} 道题 | 更新于 {lib['updated_at']}")
                     with col2:
-                        if st.button("📖 加载", key=f"load_{lib['name']}"):
+                        if st.button("📖 加载", key=f"load_{lib['name']}", use_container_width=True):
                             questions = load_library(lib['name'])
                             if questions:
                                 st.session_state.questions = questions
@@ -245,13 +250,13 @@ if st.session_state.mode == "import":
                                 st.success(f"✅ 已加载题库 '{lib['name']}'")
                                 st.rerun()
                     with col3:
-                        if st.button("🗑️ 删除", key=f"del_{lib['name']}"):
+                        if st.button("🗑️ 删除", key=f"del_{lib['name']}", use_container_width=True):
                             delete_library(lib['name'])
                             st.success(f"✅ 题库 '{lib['name']}' 已删除")
                             st.rerun()
                     with col4:
                         if lib['name'] == st.session_state.current_library:
-                            st.success("✅ 当前")
+                            st.success("✅")
                     st.markdown("---")
 
 
@@ -267,7 +272,6 @@ elif st.session_state.mode == "practice":
     if st.session_state.practice_from_wrong:
         st.info(f"📝 错题集练习模式 - 共 {len(st.session_state.questions)} 道错题")
         if st.button("🔄 返回正常题库"):
-            wrong_notes = dm.load_wrong_notes()
             if st.session_state.current_library:
                 st.session_state.questions = load_library(st.session_state.current_library)
             st.session_state.practice_from_wrong = False
@@ -281,205 +285,203 @@ elif st.session_state.mode == "practice":
     progress = (current + 1) / total if total > 0 else 0
     st.progress(progress)
     
-    # 题目概览侧边栏
-    col_overview, col_main = st.columns([1, 3])
-    
-    with col_overview:
-        st.markdown("### 📋 题目概览")
+    # 题目概览 - 右上角小面板
+    with st.container():
+        overview_col, main_col = st.columns([1, 4])
         
-        # 统计答题情况
-        answered_count = len(st.session_state.answers)
-        correct_count = sum(1 for a in st.session_state.answers.values() if a.get("is_correct", False))
-        
-        st.metric("已答题", f"{answered_count}/{total}")
-        st.metric("正确", correct_count)
-        
-        st.markdown("---")
-        st.markdown("**题目列表** (点击跳转)")
-        
-        # 题目概览列表
-        for i, q in enumerate(st.session_state.questions):
-            q_id = q["id"]
-            is_answered = q_id in st.session_state.answers
-            is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
-            is_current = i == current
-            
-            # 按钮样式
-            if is_current:
-                btn_type = "primary"
-            elif is_correct:
-                btn_type = "success"
-            elif is_answered:
-                btn_type = "secondary"
-            else:
-                btn_type = "secondary"
-            
-            # 题目类型图标
-            icon = "📝" if q["type"] == "single_choice" else "📖"
-            
-            if st.button(
-                f"{icon} 第{i+1}题",
-                key=f"nav_{i}",
-                type=btn_type,
-                use_container_width=True
-            ):
-                st.session_state.current_index = i
-                st.session_state.show_result = False
-                st.rerun()
-        
-        st.markdown("---")
-        
-        # 快捷操作
-        if st.button("🔁 从头开始", use_container_width=True):
-            st.session_state.current_index = 0
-            st.session_state.show_result = False
-            st.rerun()
-        
-        if st.button("📊 查看统计", use_container_width=True):
-            st.session_state.mode = "stats"
-            st.rerun()
-    
-    with col_main:
-        st.write(f"### 第 {current + 1} / {total} 题")
-        
-        # 获取当前题目
-        question = st.session_state.questions[current]
-        
-        # 显示题目
-        st.markdown(f"**{question['content']}**")
-        
-        # 根据题型显示不同界面
-        if question["type"] == "single_choice":
-            options = question.get("options", [])
-            
-            with st.form(key=f"question_{current}"):
-                selected = st.radio(
-                    "请选择答案",
-                    options,
-                    key=f"radio_{current}",
-                    index=None
-                )
+        with overview_col:
+            with st.container():
+                st.markdown("### 📋 题目")
                 
-                submit = st.form_submit_button("提交答案")
+                # 统计答题情况
+                answered_count = len(st.session_state.answers)
+                correct_count = sum(1 for a in st.session_state.answers.values() if a.get("is_correct", False))
                 
-                if submit and selected:
-                    selected_option = selected.split(".")[0].strip() if selected else ""
-                    correct_option = question.get("correct_option", "")
-                    is_correct = selected_option == correct_option
-                    
-                    st.session_state.answers[question["id"]] = {
-                        "user_answer": selected,
-                        "is_correct": is_correct,
-                        "correct_answer": question.get("answer", "")
-                    }
-                    
-                    dm.save_history({
-                        "question_id": question["id"],
-                        "type": "single_choice",
-                        "user_answer": selected,
-                        "correct_answer": correct_option,
-                        "is_correct": is_correct
-                    })
-                    
-                    if not is_correct:
-                        dm.save_wrong_answer({
-                            **question,
-                            "user_answer": selected
-                        })
-                    
-                    st.session_state.show_result = True
-                    st.rerun()
-        
-        elif question["type"] == "case_analysis":
-            sub_questions = question.get("sub_questions", [])
-            
-            if sub_questions:
-                st.markdown("**问题：**")
-                for i, sq in enumerate(sub_questions, 1):
-                    st.write(f"{i}. {sq}")
-            
-            user_answer = st.text_area(
-                "请输入你的答案",
-                key=f"text_{current}",
-                height=200,
-                placeholder="请输入关键词或完整答案..."
-            )
-            
-            if st.button("提交答案"):
-                if user_answer.strip():
-                    keywords = question.get("keywords", [])
-                    is_correct, match_rate, matched_keywords = calculate_keyword_match(user_answer, keywords)
-                    
-                    st.session_state.answers[question["id"]] = {
-                        "user_answer": user_answer,
-                        "is_correct": is_correct,
-                        "match_rate": match_rate,
-                        "matched_keywords": matched_keywords
-                    }
-                    
-                    dm.save_history({
-                        "question_id": question["id"],
-                        "type": "case_analysis",
-                        "user_answer": user_answer,
-                        "is_correct": is_correct,
-                        "match_rate": match_rate
-                    })
-                    
-                    if not is_correct:
-                        dm.save_wrong_answer({
-                            **question,
-                            "user_answer": user_answer
-                        })
-                    
-                    st.session_state.show_result = True
-                    st.rerun()
-                else:
-                    st.warning("请先输入答案")
-        
-        # 显示结果和解析
-        if st.session_state.show_result and question["id"] in st.session_state.answers:
-            answer_info = st.session_state.answers[question["id"]]
-            
-            st.markdown("---")
-            
-            if answer_info["is_correct"]:
-                st.success("✅ 回答正确！")
-            else:
-                st.error("❌ 回答错误")
+                st.metric("已答", f"{answered_count}/{total}")
+                st.metric("正确", correct_count)
                 
-                if question["type"] == "case_analysis":
-                    match_rate = answer_info.get("match_rate", 0)
-                    matched = answer_info.get("matched_keywords", [])
-                    st.write(f"**关键词匹配度**: {match_rate:.1%}")
-                    if matched:
-                        st.write(f"**命中的关键词**: {', '.join(matched)}")
-            
-            with st.expander("📖 查看参考答案", expanded=True):
-                st.write(question["answer"])
-            
-            with st.expander("💡 查看解析", expanded=True):
-                st.write(question["analysis"])
-            
-            col1, col2, col3 = st.columns([1, 1, 1])
-            with col1:
-                if st.button("⏮️ 上一题", disabled=current == 0, use_container_width=True):
-                    st.session_state.current_index -= 1
-                    st.session_state.show_result = False
-                    st.rerun()
-            with col2:
-                if current < total - 1:
-                    if st.button("下一题 ⏭️", use_container_width=True):
-                        st.session_state.current_index += 1
+                st.markdown("---")
+                
+                # 题目列表 - 紧凑按钮
+                for i, q in enumerate(st.session_state.questions):
+                    q_id = q["id"]
+                    is_answered = q_id in st.session_state.answers
+                    is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
+                    is_current = i == current
+                    
+                    # 按钮样式
+                    if is_current:
+                        btn_type = "primary"
+                    elif is_correct:
+                        btn_type = "success"
+                    elif is_answered:
+                        btn_type = "secondary"
+                    else:
+                        btn_type = "secondary"
+                    
+                    # 题目类型图标
+                    icon = "▢" if q["type"] == "single_choice" else "◫"
+                    
+                    if st.button(
+                        f"{icon}{i+1}",
+                        key=f"nav_{i}",
+                        type=btn_type,
+                        use_container_width=True,
+                        help=st.session_state.answers.get(q_id, {}).get("is_correct", False) and "✓" or ""
+                    ):
+                        st.session_state.current_index = i
                         st.session_state.show_result = False
                         st.rerun()
-                else:
-                    st.success("🎉 已完成所有题目！")
-            with col3:
-                if st.button("🔁 重新作答", use_container_width=True):
-                    st.session_state.answers = {}
+                
+                st.markdown("---")
+                
+                # 快捷操作
+                if st.button("🔁 从头开始", use_container_width=True, key="restart_practice"):
                     st.session_state.current_index = 0
                     st.session_state.show_result = False
                     st.rerun()
+        
+        with main_col:
+            st.write(f"#### 第 {current + 1} / {total} 题")
+            
+            # 获取当前题目
+            question = st.session_state.questions[current]
+            
+            # 显示题目
+            st.markdown(f"**{question['content']}**")
+            
+            # 根据题型显示不同界面
+            if question["type"] == "single_choice":
+                options = question.get("options", [])
+                
+                with st.form(key=f"question_{current}"):
+                    selected = st.radio(
+                        "请选择答案",
+                        options,
+                        key=f"radio_{current}",
+                        index=None
+                    )
+                    
+                    submit = st.form_submit_button("提交答案")
+                    
+                    if submit and selected:
+                        selected_option = selected.split(".")[0].strip() if selected else ""
+                        correct_option = question.get("correct_option", "")
+                        is_correct = selected_option == correct_option
+                        
+                        st.session_state.answers[question["id"]] = {
+                            "user_answer": selected,
+                            "is_correct": is_correct,
+                            "correct_answer": question.get("answer", "")
+                        }
+                        
+                        dm.save_history({
+                            "question_id": question["id"],
+                            "type": "single_choice",
+                            "user_answer": selected,
+                            "correct_answer": correct_option,
+                            "is_correct": is_correct
+                        })
+                        
+                        if not is_correct:
+                            dm.save_wrong_answer({
+                                **question,
+                                "user_answer": selected
+                            })
+                        
+                        st.session_state.show_result = True
+                        st.rerun()
+            
+            elif question["type"] == "case_analysis":
+                sub_questions = question.get("sub_questions", [])
+                
+                if sub_questions:
+                    st.markdown("**问题：**")
+                    for i, sq in enumerate(sub_questions, 1):
+                        st.write(f"{i}. {sq}")
+                
+                user_answer = st.text_area(
+                    "请输入你的答案",
+                    key=f"text_{current}",
+                    height=200,
+                    placeholder="请输入关键词或完整答案..."
+                )
+                
+                if st.button("提交答案"):
+                    if user_answer.strip():
+                        keywords = question.get("keywords", [])
+                        is_correct, match_rate, matched_keywords = calculate_keyword_match(user_answer, keywords)
+                        
+                        st.session_state.answers[question["id"]] = {
+                            "user_answer": user_answer,
+                            "is_correct": is_correct,
+                            "match_rate": match_rate,
+                            "matched_keywords": matched_keywords
+                        }
+                        
+                        dm.save_history({
+                            "question_id": question["id"],
+                            "type": "case_analysis",
+                            "user_answer": user_answer,
+                            "is_correct": is_correct,
+                            "match_rate": match_rate
+                        })
+                        
+                        if not is_correct:
+                            dm.save_wrong_answer({
+                                **question,
+                                "user_answer": user_answer
+                            })
+                        
+                        st.session_state.show_result = True
+                        st.rerun()
+                    else:
+                        st.warning("请先输入答案")
+            
+            # 显示结果和解析
+            if st.session_state.show_result and question["id"] in st.session_state.answers:
+                answer_info = st.session_state.answers[question["id"]]
+                
+                st.markdown("---")
+                
+                if answer_info["is_correct"]:
+                    st.success("✅ 回答正确！")
+                else:
+                    st.error("❌ 回答错误")
+                    
+                    if question["type"] == "case_analysis":
+                        match_rate = answer_info.get("match_rate", 0)
+                        matched = answer_info.get("matched_keywords", [])
+                        st.write(f"**关键词匹配度**: {match_rate:.1%}")
+                        if matched:
+                            st.write(f"**命中的关键词**: {', '.join(matched)}")
+                
+                with st.expander("📖 查看参考答案", expanded=True):
+                    st.write(question["answer"])
+                
+                with st.expander("💡 查看解析", expanded=True):
+                    st.write(question["analysis"])
+                
+                col1, col2, col3 = st.columns([1, 1, 1])
+                with col1:
+                    if st.button("⏮️ 上一题", disabled=current == 0, use_container_width=True):
+                        st.session_state.current_index -= 1
+                        st.session_state.show_result = False
+                        st.rerun()
+                with col2:
+                    if current < total - 1:
+                        if st.button("下一题 ⏭️", use_container_width=True):
+                            st.session_state.current_index += 1
+                            st.session_state.show_result = False
+                            st.rerun()
+                    else:
+                        st.success("🎉 已完成所有题目！")
+                with col3:
+                    if st.button("🔁 重新作答", use_container_width=True):
+                        st.session_state.answers = {}
+                        st.session_state.current_index = 0
+                        st.session_state.show_result = False
+                        st.rerun()
 
 
 # ============== 页面：错题集 ==============
@@ -580,7 +582,7 @@ elif st.session_state.mode == "stats":
     
     # 题库信息
     st.markdown("---")
-    st.subheader("📚 题库信息")
+    st.subheader("📚 本地题库")
     libraries = get_saved_libraries()
     if libraries:
         for lib in libraries:
