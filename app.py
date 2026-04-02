@@ -328,13 +328,7 @@ elif st.session_state.mode == "practice":
         question = st.session_state.questions[current]
         
         # 显示题目
-            st.write(f"#### 第 {current + 1} / {total} 题")
-            
-            # 获取当前题目
-            question = st.session_state.questions[current]
-            
-            # 显示题目
-            st.markdown(f"**{question['content']}**")
+        st.markdown(f"**{question['content']}**")
             
             # 根据题型显示不同界面
             if question["type"] == "single_choice":
