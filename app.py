@@ -420,7 +420,7 @@ elif st.session_state.mode == "practice":
             st.markdown(f"**{content}**")
         
         # 根据题型显示不同界面
-        if question["type"] == "single_choice":
+        if question["type"] in ["single_choice", "multiple_choice"]:
             options = question.get("options", [])
             is_multiple = question.get("is_multiple", False)
             
