@@ -431,13 +431,14 @@ elif st.session_state.mode == "practice":
             
             with st.form(key=form_key):
                 if is_multiple:
-                    # 多选题使用复选框
-                    option_map = {opt.split(".")[0].strip(): opt for opt in options}
-                    selected_options = st.checkbox_group(
-                        "请选择答案（可多选）",
-                        options=option_map.keys(),
-                        key=checkbox_key
-                    )
+                    # 多选题使用多个 checkbox
+                    st.write("**请选择答案（可多选）**")
+                    selected_options = []
+                    for opt in options:
+                        opt_letter = opt.split(".")[0].strip()
+                        opt_text = opt.split(".", 1)[1].strip() if "." in opt else opt
+                        if st.checkbox(f"{opt_letter}. {opt_text}", key=f"{checkbox_key}_{opt_letter}"):
+                            selected_options.append(opt_letter)
                 else:
                     # 单选题使用单选框
                     selected = st.radio(
