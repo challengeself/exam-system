@@ -120,9 +120,9 @@ def group_questions_by_case(questions):
             continue
         
         # 笔试选择题：从 ID 提取案例标识
-        # ID 格式：case_单选_1_1, case_多选_1_3 等，数字部分是案例索引
+        # ID 格式：case_单选_1_1, case_多选_1_3 等，第一个数字部分是案例索引
         import re
-        match = re.search(r'case_(?:单选 | 多选)_(\d+)_', q_id)
+        match = re.search(r'case_.*?_(\d+)_(\d+)', q_id)
         if match:
             case_idx = match.group(1)
             if current_case_prefix is None:
