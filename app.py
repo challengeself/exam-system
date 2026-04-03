@@ -223,12 +223,11 @@ if st.session_state.mode == "import":
                 with st.expander("📋 题目预览", expanded=False):
                     single_count = sum(1 for q in all_questions if q["type"] == "single_choice")
                     multiple_count = sum(1 for q in all_questions if q["type"] == "multiple_choice")
-                    case_count = sum(1 for q in all_questions if q["type"] == "case_analysis")
                     interview_count = sum(1 for q in all_questions if q["type"] == "case_interview")
                     st.write(f"- 单选题：{single_count} 道")
                     st.write(f"- 多选题：{multiple_count} 道")
-                    st.write(f"- 笔试案例题：{case_count} 道")
                     st.write(f"- 面试答辩题：{interview_count} 道")
+                    st.caption("💡 注：笔试案例题中的单选/多选已拆分为独立题目")
     
     with tab2:
         st.markdown("### 已保存的题库")
@@ -337,32 +336,48 @@ elif st.session_state.mode == "practice":
         # 根据题型显示不同界面
         if question["type"] == "single_choice":
             options = question.get("options", [])
+            is_multiple = question.get("is_multiple", False)
             
             with st.form(key=f"question_{current}"):
-                selected = st.radio(
-                    "请选择答案",
-                    options,
-                    key=f"radio_{current}",
-                    index=None
-                )
+                if is_multiple:
+                    # 多选题使用复选框
+                    option_map = {opt.split(".")[0].strip(): opt for opt in options}
+                    selected_options = st.checkbox_group(
+                        "请选择答案（可多选）",
+                        options=option_map.keys(),
+                        key=f"checkbox_{current}"
+                    )
+                else:
+                    # 单选题使用单选框
+                    selected = st.radio(
+                        "请选择答案",
+                        options,
+                        key=f"radio_{current}",
+                        index=None
+                    )
+                    selected_options = [selected.split(".")[0].strip()] if selected else []
                 
                 submit = st.form_submit_button("提交答案")
                 
-                if submit and selected:
-                    selected_option = selected.split(".")[0].strip() if selected else ""
+                if submit and selected_options:
                     correct_option = question.get("correct_option", "")
-                    is_correct = selected_option == correct_option
+                    # 正确答案可能是多个字母（如"ABCD"）
+                    correct_set = set(correct_option)
+                    selected_set = set(selected_options)
+                    is_correct = selected_set == correct_set
+                    
+                    user_answer_str = "".join(selected_options) if is_multiple else selected_options[0]
                     
                     st.session_state.answers[question["id"]] = {
-                        "user_answer": selected,
+                        "user_answer": user_answer_str,
                         "is_correct": is_correct,
-                        "correct_answer": question.get("answer", "")
+                        "correct_answer": correct_option
                     }
                     
                     dm.save_history({
                         "question_id": question["id"],
-                        "type": "single_choice",
-                        "user_answer": selected,
+                        "type": "multiple_choice" if is_multiple else "single_choice",
+                        "user_answer": user_answer_str,
                         "correct_answer": correct_option,
                         "is_correct": is_correct
                     })
@@ -370,7 +385,7 @@ elif st.session_state.mode == "practice":
                     if not is_correct:
                         dm.save_wrong_answer({
                             **question,
-                            "user_answer": selected
+                            "user_answer": user_answer_str
                         })
                     
                     st.session_state.show_result = True

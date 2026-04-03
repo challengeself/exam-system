@@ -145,7 +145,7 @@ def parse_multiple_choice(lines: List[str], start_idx: int) -> Tuple[SingleChoic
     ), i
 
 
-def parse_case_analysis_written(lines: List[str], start_idx: int) -> Tuple[CaseAnalysisQuestion, int]:
+def parse_case_analysis_written(lines: List[str], start_idx: int) -> Tuple[List, int]:
     """
     解析笔试格式案例分析题（案例 + 单选/多选）
     格式：
@@ -160,10 +160,11 @@ def parse_case_analysis_written(lines: List[str], start_idx: int) -> Tuple[CaseA
     多选
     1. 题目内容（）
     ...
+    
+    返回：独立的单选/多选题列表，每道题都包含案例背景
     """
-    question_id = f"case_written_{start_idx}"
+    questions = []
     case_background = ""
-    sub_questions = []
     
     i = start_idx
     current_field = "background"
@@ -172,6 +173,7 @@ def parse_case_analysis_written(lines: List[str], start_idx: int) -> Tuple[CaseA
     current_options = []
     current_answer = ""
     current_analysis = ""
+    question_counter = 0
     
     while i < len(lines):
         line = lines[i].strip()
@@ -194,14 +196,26 @@ def parse_case_analysis_written(lines: List[str], start_idx: int) -> Tuple[CaseA
         
         # 检测题型标记
         if line in ["单选", "多选"]:
+            # 保存之前的题目（如果有）
             if current_question and current_answer:
-                sub_questions.append({
-                    "content": current_question,
-                    "type": question_type,
-                    "options": current_options,
-                    "answer": current_answer,
-                    "analysis": current_analysis
-                })
+                question_counter += 1
+                q_type = QuestionType.MULTIPLE_CHOICE if question_type == "多选" else QuestionType.SINGLE_CHOICE
+                q_id = f"case_{question_type}_{start_idx}_{question_counter}"
+                
+                # 提取关键词
+                all_keywords = extract_keywords(current_analysis)
+                
+                questions.append(SingleChoiceQuestion(
+                    id=q_id,
+                    type=q_type,
+                    content=f"【案例】{case_background}\n\n{current_question}",
+                    answer=current_answer,
+                    analysis=current_analysis,
+                    options=current_options,
+                    correct_option=current_answer,
+                    is_multiple=(question_type == "多选"),
+                    keywords=all_keywords
+                ))
             
             question_type = line
             current_field = "question"
@@ -214,14 +228,26 @@ def parse_case_analysis_written(lines: List[str], start_idx: int) -> Tuple[CaseA
         
         # 检测题目（数字开头）
         if re.match(r'^[\d]+[.．]', line):
+            # 保存之前的题目（如果有）
             if current_question and current_answer:
-                sub_questions.append({
-                    "content": current_question,
-                    "type": question_type,
-                    "options": current_options,
-                    "answer": current_answer,
-                    "analysis": current_analysis
-                })
+                question_counter += 1
+                q_type = QuestionType.MULTIPLE_CHOICE if question_type == "多选" else QuestionType.SINGLE_CHOICE
+                q_id = f"case_{question_type}_{start_idx}_{question_counter}"
+                
+                # 提取关键词
+                all_keywords = extract_keywords(current_analysis)
+                
+                questions.append(SingleChoiceQuestion(
+                    id=q_id,
+                    type=q_type,
+                    content=f"【案例】{case_background}\n\n{current_question}",
+                    answer=current_answer,
+                    analysis=current_analysis,
+                    options=current_options,
+                    correct_option=current_answer,
+                    is_multiple=(question_type == "多选"),
+                    keywords=all_keywords
+                ))
                 current_question = ""
                 current_options = []
                 current_answer = ""
@@ -269,40 +295,28 @@ def parse_case_analysis_written(lines: List[str], start_idx: int) -> Tuple[CaseA
         
         i += 1
     
-    # 保存最后一个子问题
+    # 保存最后一个题目
     if current_question and current_answer:
-        sub_questions.append({
-            "content": current_question,
-            "type": question_type,
-            "options": current_options,
-            "answer": current_answer,
-            "analysis": current_analysis
-        })
+        question_counter += 1
+        q_type = QuestionType.MULTIPLE_CHOICE if question_type == "多选" else QuestionType.SINGLE_CHOICE
+        q_id = f"case_{question_type}_{start_idx}_{question_counter}"
+        
+        # 提取关键词
+        all_keywords = extract_keywords(current_analysis)
+        
+        questions.append(SingleChoiceQuestion(
+            id=q_id,
+            type=q_type,
+            content=f"【案例】{case_background}\n\n{current_question}",
+            answer=current_answer,
+            analysis=current_analysis,
+            options=current_options,
+            correct_option=current_answer,
+            is_multiple=(question_type == "多选"),
+            keywords=all_keywords
+        ))
     
-    # 提取关键词
-    all_text = " ".join([sq.get("analysis", "") for sq in sub_questions])
-    all_keywords = extract_keywords(all_text)
-    
-    # 构建案例题内容
-    content = f"【案例】{case_background}"
-    
-    # 构建答案和解析
-    full_answer = ""
-    full_analysis = ""
-    for sq in sub_questions:
-        full_answer += f"[{sq['type']}] {sq['content']} 答案：{sq['answer']}\n"
-        full_analysis += f"[{sq['type']}] {sq['content']}\n答案：{sq['answer']}\n分析：{sq['analysis']}\n\n"
-    
-    return CaseAnalysisQuestion(
-        id=question_id,
-        type=QuestionType.CASE_ANALYSIS,
-        content=content,
-        answer=full_answer.strip(),
-        analysis=full_analysis.strip(),
-        keywords=all_keywords,
-        case_background=case_background,
-        sub_questions=[sq["content"] for sq in sub_questions]
-    ), i
+    return questions, i
 
 
 def parse_case_interview(lines: List[str], start_idx: int) -> Tuple[CaseInterviewQuestion, int]:
@@ -564,10 +578,10 @@ def parse_word_document(file_path: str) -> List[Question]:
                 except Exception as e:
                     print(f"解析面试答辩题失败 {i}: {e}")
             else:
-                # 否则是笔试格式（案例 + 单选/多选）
+                # 否则是笔试格式（案例 + 单选/多选）- 返回多个独立题目
                 try:
-                    q, next_i = parse_case_analysis_written(lines, i)
-                    questions.append(q)
+                    q_list, next_i = parse_case_analysis_written(lines, i)
+                    questions.extend(q_list)  # 添加所有独立题目
                     i = next_i
                     continue
                 except Exception as e:
