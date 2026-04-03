@@ -6,7 +6,9 @@ from enum import Enum
 
 class QuestionType(Enum):
     SINGLE_CHOICE = "single_choice"  # 单选题
+    MULTIPLE_CHOICE = "multiple_choice"  # 多选题
     CASE_ANALYSIS = "case_analysis"  # 案例分析（问答题）
+    CASE_INTERVIEW = "case_interview"  # 面试答辩题（案例 + 问题 + 分析）
 
 
 @dataclass
@@ -25,9 +27,10 @@ class Question:
 
 @dataclass
 class SingleChoiceQuestion(Question):
-    """单选题"""
+    """单选题/多选题"""
     options: List[str] = field(default_factory=list)  # 选项列表
     correct_option: str = ""  # 正确选项（A/B/C/D）
+    is_multiple: bool = False  # 是否多选题
 
 
 @dataclass
@@ -36,6 +39,14 @@ class CaseAnalysisQuestion(Question):
     case_content: str = ""  # 案例描述
     sub_questions: List[str] = field(default_factory=list)  # 子问题列表
     case_background: str = ""  # 案例背景
+
+
+@dataclass
+class CaseInterviewQuestion(Question):
+    """面试答辩题"""
+    case_background: str = ""  # 案例背景
+    questions: List[str] = field(default_factory=list)  # 问题列表
+    analysis_items: List[dict] = field(default_factory=list)  # 试题分析项 [{title, content, scoring_points}]
 
 
 def calculate_keyword_match(user_answer: str, keywords: List[str]) -> tuple[bool, float, List[str]]:

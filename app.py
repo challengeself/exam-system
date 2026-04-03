@@ -222,9 +222,13 @@ if st.session_state.mode == "import":
                 # 题目预览
                 with st.expander("📋 题目预览", expanded=False):
                     single_count = sum(1 for q in all_questions if q["type"] == "single_choice")
+                    multiple_count = sum(1 for q in all_questions if q["type"] == "multiple_choice")
                     case_count = sum(1 for q in all_questions if q["type"] == "case_analysis")
+                    interview_count = sum(1 for q in all_questions if q["type"] == "case_interview")
                     st.write(f"- 单选题：{single_count} 道")
-                    st.write(f"- 案例分析题：{case_count} 道")
+                    st.write(f"- 多选题：{multiple_count} 道")
+                    st.write(f"- 笔试案例题：{case_count} 道")
+                    st.write(f"- 面试答辩题：{interview_count} 道")
     
     with tab2:
         st.markdown("### 已保存的题库")
@@ -423,6 +427,66 @@ elif st.session_state.mode == "practice":
                     st.rerun()
                 else:
                     st.warning("请先输入答案")
+        
+        elif question["type"] == "case_interview":
+            # 面试答辩题
+            case_background = question.get("case_background", "")
+            if case_background:
+                st.markdown(f"**【案例描述】**\n\n{case_background}")
+                st.markdown("---")
+            
+            # 显示问题列表
+            interview_questions = question.get("questions", [])
+            if interview_questions:
+                st.markdown("**【问题】**")
+                for i, q in enumerate(interview_questions, 1):
+                    st.write(f"{i}. {q}")
+            
+            st.markdown("**【请逐题回答】**")
+            
+            # 为每个问题创建独立的答题区域
+            user_answers = {}
+            for i, q in enumerate(interview_questions):
+                user_answers[i] = st.text_area(
+                    f"问题{i+1}的答案",
+                    key=f"interview_q{current}_{i}",
+                    height=150,
+                    placeholder=f"请回答问题{i+1}..."
+                )
+            
+            if st.button("提交答案"):
+                all_answers = {i: ans for i, ans in user_answers.items() if ans.strip()}
+                if all_answers:
+                    # 合并所有答案进行关键词匹配
+                    combined_answer = "\n".join(all_answers.values())
+                    keywords = question.get("keywords", [])
+                    is_correct, match_rate, matched_keywords = calculate_keyword_match(combined_answer, keywords)
+                    
+                    st.session_state.answers[question["id"]] = {
+                        "user_answer": all_answers,
+                        "is_correct": is_correct,
+                        "match_rate": match_rate,
+                        "matched_keywords": matched_keywords
+                    }
+                    
+                    dm.save_history({
+                        "question_id": question["id"],
+                        "type": "case_interview",
+                        "user_answer": all_answers,
+                        "is_correct": is_correct,
+                        "match_rate": match_rate
+                    })
+                    
+                    if not is_correct:
+                        dm.save_wrong_answer({
+                            **question,
+                            "user_answer": combined_answer
+                        })
+                    
+                    st.session_state.show_result = True
+                    st.rerun()
+                else:
+                    st.warning("请至少回答一个问题")
     
     # 显示结果和解析
     if st.session_state.show_result and question["id"] in st.session_state.answers:
