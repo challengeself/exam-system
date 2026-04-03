@@ -671,43 +671,51 @@ elif st.session_state.mode == "practice":
             else:
                 st.markdown(f"案例{case_num} ({answered_in_case}/{total_in_case})")
             
-            # 显示本案例内各小题状态
-            case_cols = st.columns(min(total_in_case, 10))
-            for sub_idx, q in enumerate(case_group):
-                with case_cols[sub_idx]:
-                    q_id = q.get("id")
-                    is_answered = q_id in st.session_state.answers
-                    is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
-                    is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
-                    
-                    # 按钮样式
-                    if is_current:
-                        btn_type = "primary"
-                    elif is_correct:
-                        btn_type = "success"
-                    elif is_answered:
-                        btn_type = "secondary"
-                    else:
-                        btn_type = "secondary"
-                    
-                    # 按钮标签
-                    btn_label = f"{sub_idx + 1}"
-                    if is_correct:
-                        btn_label = "✅"
-                    elif is_answered:
-                        btn_label = "❌"
-                    
-                    if st.button(
-                        btn_label,
-                        key=f"nav_{case_idx}_{sub_idx}",
-                        type=btn_type,
-                        use_container_width=True,
-                        help=f"案例{case_num}-小题{sub_idx+1}"
-                    ):
-                        st.session_state.current_index = case_idx
-                        st.session_state.sub_current_index = sub_idx
-                        st.session_state.show_result = False
-                        st.rerun()
+            # 显示本案例内各小题状态（每行最多 10 个）
+            cols_count = min(total_in_case, 10)
+            rows = (total_in_case + cols_count - 1) // cols_count
+            
+            for row in range(rows):
+                row_cols = st.columns(cols_count)
+                start_idx = row * cols_count
+                end_idx = min(start_idx + cols_count, total_in_case)
+                
+                for col_idx, sub_idx in enumerate(range(start_idx, end_idx)):
+                    with row_cols[col_idx]:
+                        q = case_group[sub_idx]
+                        q_id = q.get("id")
+                        is_answered = q_id in st.session_state.answers
+                        is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
+                        is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
+                        
+                        # 按钮样式
+                        if is_current:
+                            btn_type = "primary"
+                        elif is_correct:
+                            btn_type = "success"
+                        elif is_answered:
+                            btn_type = "secondary"
+                        else:
+                            btn_type = "secondary"
+                        
+                        # 按钮标签
+                        btn_label = f"{sub_idx + 1}"
+                        if is_correct:
+                            btn_label = "✅"
+                        elif is_answered:
+                            btn_label = "❌"
+                        
+                        if st.button(
+                            btn_label,
+                            key=f"nav_{case_idx}_{sub_idx}",
+                            type=btn_type,
+                            use_container_width=True,
+                            help=f"案例{case_num}-小题{sub_idx+1}"
+                        ):
+                            st.session_state.current_index = case_idx
+                            st.session_state.sub_current_index = sub_idx
+                            st.session_state.show_result = False
+                            st.rerun()
             
             st.markdown("---")
         
