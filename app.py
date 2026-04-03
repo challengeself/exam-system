@@ -330,8 +330,23 @@ elif st.session_state.mode == "practice":
         # 获取当前题目
         question = st.session_state.questions[current]
         
-        # 显示题目
-        st.markdown(f"**{question['content']}**")
+        # 分离案例背景和题目内容
+        content = question.get("content", "")
+        if content.startswith("【案例】"):
+            # 提取案例背景和题目
+            parts = content.split("\n\n", 1)
+            case_background = parts[0].replace("【案例】", "").strip()
+            question_text = parts[1].strip() if len(parts) > 1 else ""
+            
+            # 显示案例背景（可折叠）
+            with st.expander("📖 案例背景", expanded=True):
+                st.markdown(case_background)
+            
+            # 显示题目
+            st.markdown(f"**{question_text}**")
+        else:
+            # 普通题目（无案例背景）
+            st.markdown(f"**{content}**")
         
         # 根据题型显示不同界面
         if question["type"] == "single_choice":
