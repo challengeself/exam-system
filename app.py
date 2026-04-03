@@ -424,21 +424,26 @@ elif st.session_state.mode == "practice":
             options = question.get("options", [])
             is_multiple = question.get("is_multiple", False)
             
-            with st.form(key=f"question_{current}"):
+            # 使用案例索引 + 小题索引作为唯一 key
+            form_key = f"question_{current_case_idx}_{current_sub_idx}"
+            radio_key = f"radio_{current_case_idx}_{current_sub_idx}"
+            checkbox_key = f"checkbox_{current_case_idx}_{current_sub_idx}"
+            
+            with st.form(key=form_key):
                 if is_multiple:
                     # 多选题使用复选框
                     option_map = {opt.split(".")[0].strip(): opt for opt in options}
                     selected_options = st.checkbox_group(
                         "请选择答案（可多选）",
                         options=option_map.keys(),
-                        key=f"checkbox_{current}"
+                        key=checkbox_key
                     )
                 else:
                     # 单选题使用单选框
                     selected = st.radio(
                         "请选择答案",
                         options,
-                        key=f"radio_{current}",
+                        key=radio_key,
                         index=None
                     )
                     selected_options = [selected.split(".")[0].strip()] if selected else []
@@ -493,7 +498,7 @@ elif st.session_state.mode == "practice":
             
             user_answer = st.text_area(
                 "请输入你的答案",
-                key=f"text_{current}",
+                key=f"text_{current_case_idx}_{current_sub_idx}",
                 height=200,
                 placeholder="请输入关键词或完整答案..."
             )
@@ -550,7 +555,7 @@ elif st.session_state.mode == "practice":
             for i, q in enumerate(interview_questions):
                 user_answers[i] = st.text_area(
                     f"问题{i+1}的答案",
-                    key=f"interview_q{current}_{i}",
+                    key=f"interview_q{current_case_idx}_{current_sub_idx}_{i}",
                     height=150,
                     placeholder=f"请回答问题{i+1}..."
                 )
