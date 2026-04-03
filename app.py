@@ -56,22 +56,34 @@ def get_saved_libraries():
             return json.load(f)
     return []
 
+def question_to_dict(q):
+    """将题目对象转换为字典（确保 JSON 可序列化）"""
+    from dataclasses import asdict
+    d = asdict(q)
+    # 确保 type 是字符串而不是枚举
+    if hasattr(d['type'], 'value'):
+        d['type'] = d['type'].value
+    return d
+
 def save_library(library_name, questions_data):
     """保存题库"""
     libraries_file = "storage/libraries.json"
     libraries = get_saved_libraries()
     
+    # 转换为字典列表（确保 JSON 可序列化）
+    questions_dicts = [question_to_dict(q) for q in questions_data]
+    
     # 检查是否已存在
     for lib in libraries:
         if lib["name"] == library_name:
-            lib["questions"] = questions_data
+            lib["questions"] = questions_dicts
             lib["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             break
     else:
         libraries.append({
             "name": library_name,
-            "questions": questions_data,
-            "question_count": len(questions_data),
+            "questions": questions_dicts,
+            "question_count": len(questions_dicts),
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
