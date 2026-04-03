@@ -58,12 +58,19 @@ def get_saved_libraries():
 
 def question_to_dict(q):
     """将题目对象转换为字典（确保 JSON 可序列化）"""
-    from dataclasses import asdict
-    d = asdict(q)
-    # 确保 type 是字符串而不是枚举
-    if hasattr(d['type'], 'value'):
-        d['type'] = d['type'].value
-    return d
+    from dataclasses import asdict, is_dataclass
+    # 如果已经是字典，直接返回（处理从 JSON 加载的情况）
+    if isinstance(q, dict):
+        return q
+    # 如果是 dataclass 实例，转换为字典
+    if is_dataclass(q):
+        d = asdict(q)
+        # 确保 type 是字符串而不是枚举
+        if hasattr(d.get('type'), 'value'):
+            d['type'] = d['type'].value
+        return d
+    # 其他情况直接返回
+    return q
 
 def save_library(library_name, questions_data):
     """保存题库"""
