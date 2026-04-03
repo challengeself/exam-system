@@ -443,6 +443,12 @@ elif st.session_state.mode == "practice":
             options = question.get("options", [])
             is_multiple = question.get("is_multiple", False)
             
+            # 调试信息
+            if is_multiple:
+                st.info(f"🔍 多选题检测：type={question['type']}, is_multiple={is_multiple}, options 数={len(options)}")
+                if not options:
+                    st.error("❌ 多选题没有选项！请重新上传题库")
+            
             # 使用案例索引 + 小题索引作为唯一 key
             form_key = f"question_{current_case_idx}_{current_sub_idx}"
             radio_key = f"radio_{current_case_idx}_{current_sub_idx}"
