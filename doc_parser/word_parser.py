@@ -312,9 +312,11 @@ def parse_case_interview(lines: List[str], start_idx: int) -> Tuple[CaseIntervie
             i += 1
             continue
         
-        # 检测新案例开始
-        if line.startswith('案例') and line != '案例描述' and any(c in line for c in '0123456789 一二三四五六七八九十'):
+        # 检测新案例开始（支持"案例 X"和"题目：案例描述（X）"格式）
+        if (line.startswith('案例') and line != '案例描述' and any(c in line for c in '0123456789 一二三四五六七八九十')) or \
+           (line.startswith('题目：案例描述') and case_background):
             if case_background:
+                # 已有案例背景，说明遇到新案例，结束当前案例解析
                 break
             i += 1
             continue
@@ -412,6 +414,8 @@ def parse_case_interview(lines: List[str], start_idx: int) -> Tuple[CaseIntervie
     all_text = case_background + " " + " ".join([item.get("content", "") for item in analysis_items])
     all_keywords = extract_keywords(all_text)
     
+    # content 包含完整案例描述，case_background 只包含背景部分
+    # 为了避免重复，content 使用完整描述，case_background 作为单独字段
     content = f"【案例】{case_background}"
     full_answer = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions_list)])
     

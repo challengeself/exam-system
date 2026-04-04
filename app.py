@@ -575,11 +575,7 @@ elif st.session_state.mode == "practice":
         
         elif question["type"] == "case_interview":
             # 面试答辩题
-            case_background = question.get("case_background", "")
-            if case_background:
-                st.markdown(f"**【案例描述】**\n\n{case_background}")
-                st.markdown("---")
-            
+            # 案例背景已在上面显示（从 content 提取），这里只显示问题和答题区域
             # 显示问题列表
             interview_questions = question.get("questions", [])
             if interview_questions:
