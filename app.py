@@ -444,14 +444,10 @@ elif st.session_state.mode == "practice":
             is_multiple = question.get("is_multiple", False)
             
             # 调试信息
-            st.info(f"🔍 题目类型：{question['type']}, is_multiple={is_multiple}, options 数={len(options)}")
-            if is_multiple and not options:
-                st.error("❌ 多选题没有选项！请重新上传题库")
-            if options:
-                st.caption(f"选项预览：{options[:2]}...")
-                # 调试：打印 options 详细内容
-                st.write(f"**options 变量内容**: {options}")
-                st.write(f"**options 类型**: {type(options)}")
+            if is_multiple:
+                st.info(f"🔍 多选题：{len(options)} 个选项")
+                if not options:
+                    st.error("❌ 多选题没有选项！请重新上传题库")
             
             # 使用案例索引 + 小题索引作为唯一 key
             form_key = f"question_{current_case_idx}_{current_sub_idx}"
