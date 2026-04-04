@@ -517,15 +517,28 @@ def parse_word_document(file_path: str) -> List[Question]:
     while i < len(lines):
         line = lines[i].strip()
         
-        # 检测笔试技能题格式（题目：案例描述）
+        # 检测笔试/面试技能题格式（题目：案例描述）
         if line.startswith("题目：案例描述"):
-            try:
-                q_list, next_i = parse_case_written_exam(lines, i)
-                questions.extend(q_list)
-                i = next_i
-                continue
-            except Exception as e:
-                print(f"解析笔试技能题失败 {i}: {e}")
+            # 先检查是否是面试答辩格式（有问题 + 试题分析）
+            remaining_text = " ".join(lines[i:min(i+50, len(lines))])
+            if "问题：" in remaining_text and "试题分析" in remaining_text:
+                # 面试答辩格式
+                try:
+                    q, next_i = parse_case_interview(lines, i)
+                    questions.append(q)
+                    i = next_i
+                    continue
+                except Exception as e:
+                    print(f"解析面试答辩题失败 {i}: {e}")
+            else:
+                # 笔试技能题格式
+                try:
+                    q_list, next_i = parse_case_written_exam(lines, i)
+                    questions.extend(q_list)
+                    i = next_i
+                    continue
+                except Exception as e:
+                    print(f"解析笔试技能题失败 {i}: {e}")
             i += 1
             continue
         
