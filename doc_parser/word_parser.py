@@ -324,8 +324,8 @@ def parse_case_interview(lines: List[str], start_idx: int) -> Tuple[CaseIntervie
             i += 1
             continue
         
-        # 检测"问题"部分
-        if line == "问题" or line.startswith("问题"):
+        # 检测"问题"部分（支持"问题"或"问题：xxx"格式）
+        if line == "问题" or line.startswith("问题：") or line.startswith("问题"):
             if current_analysis_title and current_analysis_content:
                 analysis_items.append({
                     "title": current_analysis_title,
@@ -367,12 +367,12 @@ def parse_case_interview(lines: List[str], start_idx: int) -> Tuple[CaseIntervie
             if "请依据" in line or "回答以下问题" in line:
                 i += 1
                 continue
-            if re.match(r'^[\d]+[,.．]', line):
-                q = re.sub(r'^[\d]+[,.．]\s*', '', line).strip()
+            if re.match(r'^\d+[\u002C\u002E\u3001]', line):
+                q = re.sub(r'^\d+[\u002C\u002E\u3001]\s*', '', line).strip()
                 questions_list.append(q)
         
         elif current_section == "analysis":
-            if re.match(r'^[\d]+[,.．]', line):
+            if re.match(r'^\d+[\u002C\u002E\u3001]', line):
                 if current_analysis_title and current_analysis_content:
                     analysis_items.append({
                         "title": current_analysis_title,

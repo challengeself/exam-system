@@ -266,6 +266,10 @@ if st.session_state.mode == "import":
                                 elif q.type.value == "case_analysis":
                                     q_dict["sub_questions"] = q.sub_questions if hasattr(q, 'sub_questions') else []
                                     q_dict["case_background"] = q.case_background if hasattr(q, 'case_background') else ""
+                                elif q.type.value == "case_interview":
+                                    q_dict["questions"] = q.questions if hasattr(q, 'questions') else []
+                                    q_dict["case_background"] = q.case_background if hasattr(q, 'case_background') else ""
+                                    q_dict["analysis_items"] = q.analysis_items if hasattr(q, 'analysis_items') else []
                                 
                                 all_questions.append(q_dict)
                             
