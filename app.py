@@ -726,7 +726,7 @@ elif st.session_state.mode == "practice":
                         if is_current:
                             btn_type = "primary"
                         elif is_correct:
-                            btn_type = "success"
+                            btn_type = "primary"
                         elif is_answered:
                             btn_type = "secondary"
                         else:
