@@ -379,6 +379,71 @@ def parse_case_interview(lines: List[str], start_idx: int) -> Tuple[CaseIntervie
     ), i
 
 
+def parse_simple_questions(lines: List[str], start_idx: int) -> Tuple[List, int]:
+    """
+    解析简单题目格式（无案例，直接题目）
+    格式：
+    题目：1、xxx 或 题目：单选 1、xxx
+    选项：A. xxx B. xxx C. xxx D. xxx
+    答案：xxx
+    分析：xxx
+    """
+    questions = []
+    current_q = None
+    
+    i = start_idx
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        if not line:
+            i += 1
+            continue
+        
+        # 检测题目行
+        match = re.match(r'^题目：(?:([单多] 选)\s*)?(\d+)[,，、]\s*(.+)$', line)
+        if match:
+            if current_q:
+                questions.append(current_q)
+            
+            q_type_str = match.group(1)
+            q_type = QuestionType.MULTIPLE_CHOICE if q_type_str == "多选" else QuestionType.SINGLE_CHOICE
+            is_multiple = q_type_str == "多选"
+            
+            current_q = SingleChoiceQuestion(
+                id=f"q_{match.group(2)}",
+                type=q_type,
+                is_multiple=is_multiple,
+                content=match.group(3),
+                options=[],
+                answer="",
+                analysis="",
+                correct_option="",
+                keywords=[]
+            )
+            i += 1
+            continue
+        
+        if current_q:
+            if line.startswith("选项："):
+                opts_text = line.replace("选项：", "").strip()
+                opts = re.split(r'\s+(?=[A-D]\.)', opts_text)
+                current_q.options = [o.strip() for o in opts if o.strip()]
+            elif line.startswith("答案："):
+                ans = line.replace("答案：", "").strip()
+                current_q.answer = ans
+                current_q.correct_option = ans
+            elif line.startswith("分析："):
+                current_q.analysis = line.replace("分析：", "").strip()
+                current_q.keywords = extract_keywords(current_q.analysis)
+        
+        i += 1
+    
+    if current_q:
+        questions.append(current_q)
+    
+    return questions, i
+
+
 def parse_word_document(file_path: str) -> List[Question]:
     """解析 Word 文档，返回题目列表"""
     doc = Document(file_path)
@@ -417,6 +482,20 @@ def parse_word_document(file_path: str) -> List[Question]:
                     continue
                 except Exception as e:
                     print(f"解析面试答辩题失败 {i}: {e}")
+            i += 1
+            continue
+        
+        # 检测简单题目格式（题目：1、xxx）
+        if line.startswith("题目：") and re.match(r'^题目：(?:[单多] 选\s*)?\d+', line):
+            try:
+                q_list, next_i = parse_simple_questions(lines, i)
+                questions.extend(q_list)
+                i = next_i
+                continue
+            except Exception as e:
+                print(f"解析简单题目失败 {i}: {e}")
+            i += 1
+            continue
             i += 1
             continue
         
