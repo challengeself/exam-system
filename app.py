@@ -458,20 +458,20 @@ elif st.session_state.mode == "practice":
                 if is_multiple:
                     # 多选题使用多个 checkbox
                     st.write("**请选择答案（可多选）**")
-                    # 先创建所有 checkbox
+                    # 使用字典存储 checkbox 状态
+                    checkbox_states = {}
                     for opt in options:
                         opt_letter = opt.split(".")[0].strip()
                         opt_text = opt.split(".", 1)[1].strip() if "." in opt else opt
-                        st.checkbox(f"{opt_letter}. {opt_text}", key=f"{checkbox_key}_{opt_letter}")
+                        checkbox_states[opt_letter] = st.checkbox(f"{opt_letter}. {opt_text}", key=f"{checkbox_key}_{opt_letter}")
                     
                     submit = st.form_submit_button("提交答案")
                     
                     # 提交后读取 checkbox 状态
                     if submit:
                         selected_options = []
-                        for opt in options:
-                            opt_letter = opt.split(".")[0].strip()
-                            if st.session_state.get(f"{checkbox_key}_{opt_letter}", False):
+                        for opt_letter, is_checked in checkbox_states.items():
+                            if is_checked:
                                 selected_options.append(opt_letter)
                 else:
                     # 单选题使用单选框
