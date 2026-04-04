@@ -259,9 +259,10 @@ if st.session_state.mode == "import":
                                     "keywords": q.keywords if hasattr(q, 'keywords') else []
                                 }
                                 
-                                if q.type.value == "single_choice":
+                                if q.type.value in ["single_choice", "multiple_choice"]:
                                     q_dict["options"] = q.options if hasattr(q, 'options') else []
                                     q_dict["correct_option"] = q.correct_option if hasattr(q, 'correct_option') else ""
+                                    q_dict["is_multiple"] = q.type.value == "multiple_choice"
                                 elif q.type.value == "case_analysis":
                                     q_dict["sub_questions"] = q.sub_questions if hasattr(q, 'sub_questions') else []
                                     q_dict["case_background"] = q.case_background if hasattr(q, 'case_background') else ""
