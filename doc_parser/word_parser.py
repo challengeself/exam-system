@@ -77,19 +77,43 @@ def parse_case_written_exam(lines: List[str], start_idx: int) -> Tuple[List, int
             i += 1
             continue
         
-        # 检测案例描述开始
-        if line.startswith("题目：案例描述"):
-            current_field = "case"
-            # 提取案例内容（去掉"题目：案例描述（X）、"）
-            case_content = re.sub(r'^题目：案例描述 [（(][^）)]*[)）][、,]?', '', line)
-            if case_content:
-                case_background = case_content
+        # 跳过"案例 X"行（如"案例一"、"案例 1"）
+        if re.match(r'^案例 [0-9 一二三四五六七八九十]+$', line):
             i += 1
             continue
         
-        # 累积案例内容（直到遇到单选/多选）
-        if current_field == "case" and case_background:
-            # 检查是否是单选/多选题目行
+        # 检测案例描述开始（支持两种格式）
+        # 格式 1: 题目：案例描述（X）、xxx
+        # 格式 2: 案例描述（单独一行，下一行是内容）
+        if line.startswith("题目：案例描述") or line == "案例描述":
+            current_field = "case"
+            case_background = ""
+            if line.startswith("题目：案例描述"):
+                # 格式 1：提取案例内容
+                case_content = re.sub(r'^题目：案例描述 [（(][^）)]*[)）][、,]?', '', line)
+                if case_content:
+                    case_background = case_content
+            # 格式 2：case_background 在下一行累积
+            i += 1
+            continue
+        
+        # 累积案例内容（包括第一行）
+        if current_field == "case":
+            if not case_background:
+                # 案例内容的第一行
+                case_background = line
+                i += 1
+                continue
+            
+            # 已有案例背景，检查是否是题型行
+            # 检查是否是"单选"或"多选"单独一行
+            if line in ["单选", "多选"]:
+                current_question_type = line
+                current_field = "question_type"
+                i += 1
+                continue
+            
+            # 检查是否是单选/多选题目行（格式：单选 1、xxx）
             if re.match(r'^[单多]选\s*\d+', line):
                 # 保存之前的题目（如果有）
                 if current_question_content and current_answer:
@@ -129,7 +153,41 @@ def parse_case_written_exam(lines: List[str], start_idx: int) -> Tuple[List, int
                 i += 1
                 continue
         
-        # 检测单选/多选题目行
+        # 处理"单选"/"多选"后的题目编号行（格式：1. xxx）
+        if current_field == "question_type":
+            # 保存之前的题目（如果有）
+            if current_question_content and current_answer:
+                question_counter += 1
+                q_type = QuestionType.MULTIPLE_CHOICE if current_question_type == "多选" else QuestionType.SINGLE_CHOICE
+                q_id = f"case_{current_question_type}_{start_idx}_{question_counter}"
+                
+                all_keywords = extract_keywords(current_analysis)
+                
+                questions.append(SingleChoiceQuestion(
+                    id=q_id,
+                    type=q_type,
+                    content=f"【案例】{case_background}\n\n{current_question_content}",
+                    answer=current_answer,
+                    analysis=current_analysis,
+                    options=current_options,
+                    correct_option=current_answer,
+                    is_multiple=(current_question_type == "多选"),
+                    keywords=all_keywords
+                ))
+            
+            # 解析题目编号行：1. xxx 或 1、xxx
+            match = re.match(r'^(\d+)[,.．]\s*(.*)$', line)
+            if match:
+                current_question_num = match.group(1)
+                current_question_content = match.group(2).strip()
+                current_options = []
+                current_answer = ""
+                current_analysis = ""
+                current_field = "question"
+            i += 1
+            continue
+        
+        # 检测单选/多选题目行（格式：单选 1、xxx）
         if re.match(r'^[单多]选\s*\d+', line):
             # 保存之前的题目（如果有）
             if current_question_content and current_answer:
@@ -471,8 +529,8 @@ def parse_word_document(file_path: str) -> List[Question]:
             i += 1
             continue
         
-        # 检测面试答辩格式（案例 + 问题 + 试题分析）
-        if line.startswith("案例") and not ("案例：" in line or "案例:" in line):
+        # 检测面试答辩格式（案例 + 问题 + 试题分析）- 必须在案例技能题之前
+        if line.startswith("案例") and line != "案例描述" and not line.startswith("案例："):
             remaining_text = " ".join(lines[i:min(i+50, len(lines))])
             if "试题分析" in remaining_text:
                 try:
@@ -482,8 +540,7 @@ def parse_word_document(file_path: str) -> List[Question]:
                     continue
                 except Exception as e:
                     print(f"解析面试答辩题失败 {i}: {e}")
-            i += 1
-            continue
+            # 没有试题分析，继续其他检测（不 skip）
         
         # 检测简单题目格式（题目：1、xxx）
         if line.startswith("题目：") and re.match(r'^题目：(?:[单多] 选\s*)?\d+', line):
@@ -496,6 +553,19 @@ def parse_word_document(file_path: str) -> List[Question]:
                 print(f"解析简单题目失败 {i}: {e}")
             i += 1
             continue
+        
+        # 检测案例技能题格式（案例 X + 案例描述）
+        if line.startswith("案例") and line != "案例描述" and not line.startswith("案例："):
+            # 检查后面是否有"案例描述"
+            remaining = " ".join(lines[i:min(i+10, len(lines))])
+            if "案例描述" in remaining:
+                try:
+                    q_list, next_i = parse_case_written_exam(lines, i)
+                    questions.extend(q_list)
+                    i = next_i
+                    continue
+                except Exception as e:
+                    print(f"解析案例技能题失败 {i}: {e}")
             i += 1
             continue
         
