@@ -389,11 +389,12 @@ elif st.session_state.mode == "practice":
     # 题目概览 - 右上角悬浮面板（10 列网格）
     st.markdown("""
     <style>
-    .question-panel {
+    /* 固定悬浮面板 */
+    div.question-nav-container {
         position: fixed;
         top: 70px;
         right: 15px;
-        width: 360px;
+        width: 380px;
         max-height: 85vh;
         overflow-y: auto;
         background: white;
@@ -402,76 +403,30 @@ elif st.session_state.mode == "practice":
         padding: 12px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         z-index: 999;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    .question-panel::-webkit-scrollbar {
-        width: 6px;
-    }
-    .question-panel::-webkit-scrollbar-thumb {
-        background: #ccc;
-        border-radius: 3px;
-    }
-    .question-grid {
+    /* 10 列网格 */
+    div.question-grid-row {
         display: grid;
         grid-template-columns: repeat(10, 1fr);
         gap: 4px;
-        margin-bottom: 10px;
+        margin-bottom: 6px;
     }
-    .case-label {
-        font-size: 12px;
+    /* 小正方形按钮 */
+    div.question-grid-row button {
+        width: 100% !important;
+        min-width: 28px !important;
+        height: 28px !important;
+        max-width: 28px !important;
+        padding: 0 !important;
+        font-size: 10px !important;
+        border-radius: 4px !important;
+    }
+    /* 案例标签 */
+    div.case-nav-label {
+        font-size: 11px;
         font-weight: 600;
         color: #666;
-        margin: 8px 0 6px 0;
-    }
-    .q-btn {
-        width: 100%;
-        aspect-ratio: 1;
-        min-width: 26px;
-        height: 26px;
-        font-size: 11px;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 4px;
-        border: 1px solid #ddd;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .q-btn:hover {
-        transform: scale(1.1);
-    }
-    .q-btn.current {
-        background: #0068c9;
-        color: white;
-        border-color: #0068c9;
-    }
-    .q-btn.correct {
-        background: #28a745;
-        color: white;
-        border-color: #28a745;
-    }
-    .q-btn.wrong {
-        background: #dc3545;
-        color: white;
-        border-color: #dc3545;
-    }
-    .q-btn.default {
-        background: #f8f9fa;
-        color: #333;
-    }
-    .restart-btn {
-        width: 100%;
-        padding: 8px;
-        margin-top: 10px;
-        background: #f0f0f0;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-    }
-    .restart-btn:hover {
-        background: #e0e0e0;
+        margin: 8px 0 4px 0;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -747,12 +702,11 @@ elif st.session_state.mode == "practice":
                 st.rerun()
     
     # 悬浮题目面板 - 右上角固定位置（10 列网格）
-    # 构建题目导航 HTML
-    nav_html = '<div class="question-panel">'
-    nav_html += '<div style="font-weight:600; font-size:13px; margin-bottom:10px; color:#333;">📋 题目导航</div>'
+    # 使用固定定位的 container
+    st.markdown('<div class="question-nav-container">', unsafe_allow_html=True)
+    st.markdown('<div style="font-weight:600; font-size:13px; margin-bottom:10px; color:#333;">📋 题目导航</div>', unsafe_allow_html=True)
     
-    # 全局题目计数器
-    global_q_idx = 0
+    COLS_COUNT = 10
     
     for case_idx, case_group in enumerate(st.session_state.case_groups):
         case_num = case_idx + 1
@@ -762,101 +716,61 @@ elif st.session_state.mode == "practice":
         total_in_case = len(case_group)
         
         # 案例标签
-        nav_html += f'<div class="case-label">📍 案例{case_num} ({answered_in_case}/{total_in_case})</div>'
+        st.markdown(f'<div class="case-nav-label">📍 案例{case_num} ({answered_in_case}/{total_in_case})</div>', unsafe_allow_html=True)
         
-        # 10 列网格
-        nav_html += '<div class="question-grid">'
-        
-        for sub_idx, q in enumerate(case_group):
-            q_id = q.get("id")
-            is_answered = q_id in st.session_state.answers
-            is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
-            is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
+        # 按 10 列分组显示
+        for row_start in range(0, total_in_case, COLS_COUNT):
+            row_end = min(row_start + COLS_COUNT, total_in_case)
             
-            # 确定按钮样式
-            if is_current:
-                btn_class = "current"
-                btn_label = f"{global_q_idx + 1}"
-            elif is_correct:
-                btn_class = "correct"
-                btn_label = "✓"
-            elif is_answered:
-                btn_class = "wrong"
-                btn_label = "✗"
-            else:
-                btn_class = "default"
-                btn_label = f"{global_q_idx + 1}"
+            # 创建 10 列
+            cols = st.columns(COLS_COUNT, gap="small")
             
-            # 创建 Streamlit 按钮（使用 unique key）
-            btn_key = f"nav_q{case_idx}_{sub_idx}"
-            btn_label_display = "✅" if is_correct else ("❌" if is_answered else f"{global_q_idx + 1}")
-            
-            nav_html += f'''
-            <div>
-                <button class="q-btn {btn_class}" id="btn_{case_idx}_{sub_idx}">
-                    {btn_label_display}
-                </button>
-            </div>
-            '''
-            
-            global_q_idx += 1
-        
-        nav_html += '</div>'  # 结束 question-grid
+            for col_idx in range(row_end - row_start):
+                sub_idx = row_start + col_idx
+                q = case_group[sub_idx]
+                q_id = q.get("id")
+                is_answered = q_id in st.session_state.answers
+                is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
+                is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
+                
+                with cols[col_idx]:
+                    # 按钮标签
+                    if is_correct:
+                        btn_label = "✅"
+                    elif is_answered:
+                        btn_label = "❌"
+                    else:
+                        btn_label = f"{sub_idx + 1}"
+                    
+                    # 按钮类型
+                    if is_current or is_correct:
+                        btn_type = "primary"
+                    else:
+                        btn_type = "secondary"
+                    
+                    # 小正方形按钮
+                    if st.button(
+                        btn_label,
+                        key=f"nav_{case_idx}_{sub_idx}",
+                        type=btn_type,
+                        use_container_width=True,
+                        help=f"案例{case_num}-小题{sub_idx+1}"
+                    ):
+                        st.session_state.current_index = case_idx
+                        st.session_state.sub_current_index = sub_idx
+                        st.session_state.show_result = False
+                        st.rerun()
     
     # 重新开始按钮
-    nav_html += '<button class="restart-btn" id="restart_btn">🔁 从头开始</button>'
-    nav_html += '</div>'  # 结束 question-panel
-    
-    st.markdown(nav_html, unsafe_allow_html=True)
-    
-    # 使用 JavaScript 处理点击事件
-    st.markdown("""
-    <script>
-    document.querySelectorAll('.q-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const match = this.id.match(/btn_(\\d+)_(\\d+)/);
-            if (match) {
-                const caseIdx = match[1];
-                const subIdx = match[2];
-                const url = new URL(window.location);
-                url.searchParams.set('case', caseIdx);
-                url.searchParams.set('sub', subIdx);
-                window.history.pushState({}, '', url);
-                window.location.reload();
-            }
-        });
-    });
-    
-    document.getElementById('restart_btn')?.addEventListener('click', function() {
-        const url = new URL(window.location);
-        url.searchParams.set('restart', '1');
-        window.history.pushState({}, '', url);
-        window.location.reload();
-    });
-    </script>
-    """, unsafe_allow_html=True)
-    
-    # 处理导航点击（通过 URL 参数）
-    query_params = st.query_params
-    if "case" in query_params and "sub" in query_params:
-        try:
-            new_case_idx = int(query_params["case"])
-            new_sub_idx = int(query_params["sub"])
-            st.session_state.current_index = new_case_idx
-            st.session_state.sub_current_index = new_sub_idx
-            st.session_state.show_result = False
-            st.query_params.clear()
-            st.rerun()
-        except (ValueError, KeyError):
-            pass
-    
-    if "restart" in query_params:
+    st.markdown('<div style="margin-top:10px; padding-top:8px; border-top:1px solid #eee;">', unsafe_allow_html=True)
+    if st.button("🔁 从头开始", use_container_width=True, key="restart_practice"):
         st.session_state.answers = {}
         st.session_state.current_index = 0
         st.session_state.sub_current_index = 0
         st.session_state.show_result = False
-        st.query_params.clear()
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============== 页面：错题集 ==============
