@@ -386,32 +386,92 @@ elif st.session_state.mode == "practice":
     progress = (completed_total + 1) / total_questions if total_questions > 0 else 0
     st.progress(progress)
     
-    # 题目概览 - 右上角悬浮面板
+    # 题目概览 - 右上角悬浮面板（10 列网格）
     st.markdown("""
     <style>
     .question-panel {
         position: fixed;
-        top: 100px;
-        right: 20px;
-        width: 220px;
+        top: 70px;
+        right: 15px;
+        width: 360px;
+        max-height: 85vh;
+        overflow-y: auto;
         background: white;
         border: 1px solid #e0e0e0;
         border-radius: 8px;
-        padding: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         z-index: 999;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .question-panel::-webkit-scrollbar {
+        width: 6px;
+    }
+    .question-panel::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 3px;
     }
     .question-grid {
         display: grid;
         grid-template-columns: repeat(10, 1fr);
-        gap: 5px;
+        gap: 4px;
+        margin-bottom: 10px;
     }
-    .question-btn {
-        width: 100%;
-        min-width: 18px;
-        height: 28px;
+    .case-label {
         font-size: 12px;
-        padding: 2px;
+        font-weight: 600;
+        color: #666;
+        margin: 8px 0 6px 0;
+    }
+    .q-btn {
+        width: 100%;
+        aspect-ratio: 1;
+        min-width: 26px;
+        height: 26px;
+        font-size: 11px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .q-btn:hover {
+        transform: scale(1.1);
+    }
+    .q-btn.current {
+        background: #0068c9;
+        color: white;
+        border-color: #0068c9;
+    }
+    .q-btn.correct {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+    .q-btn.wrong {
+        background: #dc3545;
+        color: white;
+        border-color: #dc3545;
+    }
+    .q-btn.default {
+        background: #f8f9fa;
+        color: #333;
+    }
+    .restart-btn {
+        width: 100%;
+        padding: 8px;
+        margin-top: 10px;
+        background: #f0f0f0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    .restart-btn:hover {
+        background: #e0e0e0;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -686,83 +746,117 @@ elif st.session_state.mode == "practice":
                 st.session_state.show_result = False
                 st.rerun()
     
-    # 悬浮题目面板 - 右上角固定位置
-    with st.container():
-        st.markdown('<div class="question-panel">', unsafe_allow_html=True)
-        st.markdown("**📋 案例**")
+    # 悬浮题目面板 - 右上角固定位置（10 列网格）
+    # 构建题目导航 HTML
+    nav_html = '<div class="question-panel">'
+    nav_html += '<div style="font-weight:600; font-size:13px; margin-bottom:10px; color:#333;">📋 题目导航</div>'
+    
+    # 全局题目计数器
+    global_q_idx = 0
+    
+    for case_idx, case_group in enumerate(st.session_state.case_groups):
+        case_num = case_idx + 1
         
-        # 显示案例分组导航
-        for case_idx, case_group in enumerate(st.session_state.case_groups):
-            case_num = case_idx + 1
-            is_current_case = case_idx == current_case_idx
+        # 计算本案例答题进度
+        answered_in_case = sum(1 for q in case_group if q.get("id") in st.session_state.answers)
+        total_in_case = len(case_group)
+        
+        # 案例标签
+        nav_html += f'<div class="case-label">📍 案例{case_num} ({answered_in_case}/{total_in_case})</div>'
+        
+        # 10 列网格
+        nav_html += '<div class="question-grid">'
+        
+        for sub_idx, q in enumerate(case_group):
+            q_id = q.get("id")
+            is_answered = q_id in st.session_state.answers
+            is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
+            is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
             
-            # 计算本案例答题进度
-            answered_in_case = sum(1 for q in case_group if q.get("id") in st.session_state.answers)
-            total_in_case = len(case_group)
-            
-            # 案例按钮
-            if is_current_case:
-                st.markdown(f"**📍 案例{case_num}** ({answered_in_case}/{total_in_case})")
+            # 确定按钮样式
+            if is_current:
+                btn_class = "current"
+                btn_label = f"{global_q_idx + 1}"
+            elif is_correct:
+                btn_class = "correct"
+                btn_label = "✓"
+            elif is_answered:
+                btn_class = "wrong"
+                btn_label = "✗"
             else:
-                st.markdown(f"案例{case_num} ({answered_in_case}/{total_in_case})")
+                btn_class = "default"
+                btn_label = f"{global_q_idx + 1}"
             
-            # 显示本案例内各小题状态（每行最多 10 个）
-            cols_count = min(total_in_case, 10)
-            rows = (total_in_case + cols_count - 1) // cols_count
+            # 创建 Streamlit 按钮（使用 unique key）
+            btn_key = f"nav_q{case_idx}_{sub_idx}"
+            btn_label_display = "✅" if is_correct else ("❌" if is_answered else f"{global_q_idx + 1}")
             
-            for row in range(rows):
-                row_cols = st.columns(cols_count)
-                start_idx = row * cols_count
-                end_idx = min(start_idx + cols_count, total_in_case)
-                
-                for col_idx, sub_idx in enumerate(range(start_idx, end_idx)):
-                    with row_cols[col_idx]:
-                        q = case_group[sub_idx]
-                        q_id = q.get("id")
-                        is_answered = q_id in st.session_state.answers
-                        is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
-                        is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
-                        
-                        # 按钮样式
-                        if is_current:
-                            btn_type = "primary"
-                        elif is_correct:
-                            btn_type = "primary"
-                        elif is_answered:
-                            btn_type = "secondary"
-                        else:
-                            btn_type = "secondary"
-                        
-                        # 按钮标签
-                        btn_label = f"{sub_idx + 1}"
-                        if is_correct:
-                            btn_label = "✅"
-                        elif is_answered:
-                            btn_label = "❌"
-                        
-                        if st.button(
-                            btn_label,
-                            key=f"nav_{case_idx}_{sub_idx}",
-                            type=btn_type,
-                            use_container_width=True,
-                            help=f"案例{case_num}-小题{sub_idx+1}"
-                        ):
-                            st.session_state.current_index = case_idx
-                            st.session_state.sub_current_index = sub_idx
-                            st.session_state.show_result = False
-                            st.rerun()
+            nav_html += f'''
+            <div>
+                <button class="q-btn {btn_class}" id="btn_{case_idx}_{sub_idx}">
+                    {btn_label_display}
+                </button>
+            </div>
+            '''
             
-            st.markdown("---")
+            global_q_idx += 1
         
-        # 快捷操作
-        if st.button("🔁 从头开始", use_container_width=True, key="restart_practice"):
-            st.session_state.current_index = 0
-            st.session_state.sub_current_index = 0
-            st.session_state.answers = {}
+        nav_html += '</div>'  # 结束 question-grid
+    
+    # 重新开始按钮
+    nav_html += '<button class="restart-btn" id="restart_btn">🔁 从头开始</button>'
+    nav_html += '</div>'  # 结束 question-panel
+    
+    st.markdown(nav_html, unsafe_allow_html=True)
+    
+    # 使用 JavaScript 处理点击事件
+    st.markdown("""
+    <script>
+    document.querySelectorAll('.q-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const match = this.id.match(/btn_(\\d+)_(\\d+)/);
+            if (match) {
+                const caseIdx = match[1];
+                const subIdx = match[2];
+                const url = new URL(window.location);
+                url.searchParams.set('case', caseIdx);
+                url.searchParams.set('sub', subIdx);
+                window.history.pushState({}, '', url);
+                window.location.reload();
+            }
+        });
+    });
+    
+    document.getElementById('restart_btn')?.addEventListener('click', function() {
+        const url = new URL(window.location);
+        url.searchParams.set('restart', '1');
+        window.history.pushState({}, '', url);
+        window.location.reload();
+    });
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # 处理导航点击（通过 URL 参数）
+    query_params = st.query_params
+    if "case" in query_params and "sub" in query_params:
+        try:
+            new_case_idx = int(query_params["case"])
+            new_sub_idx = int(query_params["sub"])
+            st.session_state.current_index = new_case_idx
+            st.session_state.sub_current_index = new_sub_idx
             st.session_state.show_result = False
+            st.query_params.clear()
             st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+        except (ValueError, KeyError):
+            pass
+    
+    if "restart" in query_params:
+        st.session_state.answers = {}
+        st.session_state.current_index = 0
+        st.session_state.sub_current_index = 0
+        st.session_state.show_result = False
+        st.query_params.clear()
+        st.rerun()
 
 
 # ============== 页面：错题集 ==============
