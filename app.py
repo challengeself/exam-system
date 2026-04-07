@@ -213,6 +213,10 @@ with st.sidebar:
         
         COLS_COUNT = 10  # 每行 10 列
         
+        # 从 session_state 读取当前索引
+        current_case_idx = st.session_state.current_index
+        current_sub_idx = st.session_state.sub_current_index
+        
         for case_idx, case_group in enumerate(st.session_state.case_groups):
             case_num = case_idx + 1
             
