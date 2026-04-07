@@ -758,6 +758,8 @@ elif st.session_state.mode == "wrong_notes":
                 st.session_state.questions = wrong_notes
                 st.session_state.practice_from_wrong = True
                 st.session_state.wrong_practice_questions = wrong_notes.copy()
+                # 为错题集生成分组（每题单独一组）
+                st.session_state.case_groups = [[q] for q in wrong_notes]
                 reset_practice_state()
                 st.session_state.mode = "practice"
                 st.rerun()
