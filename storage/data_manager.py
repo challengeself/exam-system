@@ -50,8 +50,8 @@ class DataManager:
                 note["user_answer"] = question.get("user_answer", "")
                 break
         else:
-            # 新增错题
-            wrong_notes.append({
+            # 新增错题 - 保留完整题目信息（包括 options、correct_option 等）
+            wrong_note = {
                 "id": question.get("id"),
                 "type": question.get("type"),
                 "content": question.get("content"),
@@ -61,7 +61,28 @@ class DataManager:
                 "wrong_count": 1,
                 "created_at": datetime.now().isoformat(),
                 "last_wrong_at": datetime.now().isoformat()
-            })
+            }
+            
+            # 选择题需要保留选项信息
+            if question.get("type") in ["single_choice", "multiple_choice"]:
+                wrong_note["options"] = question.get("options", [])
+                wrong_note["correct_option"] = question.get("correct_option", "")
+                wrong_note["is_multiple"] = question.get("is_multiple", False)
+            
+            # 案例题需要保留子问题和案例背景
+            if question.get("type") == "case_analysis":
+                wrong_note["sub_questions"] = question.get("sub_questions", [])
+                wrong_note["case_background"] = question.get("case_background", "")
+                wrong_note["keywords"] = question.get("keywords", [])
+            
+            # 面试答辩题需要保留问题列表
+            if question.get("type") == "case_interview":
+                wrong_note["questions"] = question.get("questions", [])
+                wrong_note["case_background"] = question.get("case_background", "")
+                wrong_note["analysis_items"] = question.get("analysis_items", [])
+                wrong_note["keywords"] = question.get("keywords", [])
+            
+            wrong_notes.append(wrong_note)
         
         with open(self.wrong_notes_file, "w", encoding="utf-8") as f:
             json.dump(wrong_notes, f, ensure_ascii=False, indent=2)
