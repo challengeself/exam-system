@@ -198,7 +198,78 @@ with st.sidebar:
     elif menu == "📊 统计":
         st.session_state.mode = "stats"
     
-    st.markdown("---")
+    # 题目导航 - 左侧栏多行多列（仅在答题页面显示）
+    if st.session_state.mode == "practice" and st.session_state.questions:
+        st.markdown("**📋 题目导航**")
+        
+        COLS_COUNT = 10  # 每行 10 列
+        
+        for case_idx, case_group in enumerate(st.session_state.case_groups):
+            case_num = case_idx + 1
+            
+            # 计算本案例答题进度
+            answered_in_case = sum(1 for q in case_group if q.get("id") in st.session_state.answers)
+            total_in_case = len(case_group)
+            
+            # 案例标签
+            st.caption(f"📍 案例{case_num} ({answered_in_case}/{total_in_case})")
+            
+            # 按 10 列分组显示多行
+            for row_start in range(0, total_in_case, COLS_COUNT):
+                row_end = min(row_start + COLS_COUNT, total_in_case)
+                
+                # 创建 10 列
+                cols = st.columns(COLS_COUNT, gap="small")
+                
+                for col_idx in range(row_end - row_start):
+                    sub_idx = row_start + col_idx
+                    q = case_group[sub_idx]
+                    q_id = q.get("id")
+                    is_answered = q_id in st.session_state.answers
+                    is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
+                    is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
+                    
+                    with cols[col_idx]:
+                        # 按钮标签
+                        if is_correct:
+                            btn_label = "✅"
+                        elif is_answered:
+                            btn_label = "❌"
+                        else:
+                            btn_label = f"{sub_idx + 1}"
+                        
+                        # 按钮类型
+                        if is_current or is_correct:
+                            btn_type = "primary"
+                        else:
+                            btn_type = "secondary"
+                        
+                        # 小正方形按钮
+                        if st.button(
+                            btn_label,
+                            key=f"nav_{case_idx}_{sub_idx}",
+                            type=btn_type,
+                            use_container_width=True,
+                            help=f"案例{case_num}-小题{sub_idx+1}"
+                        ):
+                            st.session_state.current_index = case_idx
+                            st.session_state.sub_current_index = sub_idx
+                            st.session_state.show_result = False
+                            st.rerun()
+                
+                st.markdown("")  # 行间分隔
+            
+            st.markdown("")  # 案例间分隔
+        
+        # 重新开始按钮
+        if st.button("🔁 从头开始", use_container_width=True, key="restart_practice"):
+            st.session_state.answers = {}
+            st.session_state.current_index = 0
+            st.session_state.sub_current_index = 0
+            st.session_state.show_result = False
+            st.rerun()
+        
+        st.markdown("---")
     
     # 当前题库信息
     if st.session_state.questions:
@@ -385,76 +456,6 @@ elif st.session_state.mode == "practice":
     completed_total = sum(len(st.session_state.case_groups[i]) for i in range(current_case_idx)) + current_sub_idx
     progress = (completed_total + 1) / total_questions if total_questions > 0 else 0
     st.progress(progress)
-    
-    # 题目导航 - 左下角多行多列网格
-    st.markdown("---")
-    st.markdown("**📋 题目导航**")
-    
-    COLS_COUNT = 10  # 每行 10 列
-    
-    for case_idx, case_group in enumerate(st.session_state.case_groups):
-        case_num = case_idx + 1
-        
-        # 计算本案例答题进度
-        answered_in_case = sum(1 for q in case_group if q.get("id") in st.session_state.answers)
-        total_in_case = len(case_group)
-        
-        # 案例标签
-        st.caption(f"📍 案例{case_num} ({answered_in_case}/{total_in_case})")
-        
-        # 按 10 列分组显示多行
-        for row_start in range(0, total_in_case, COLS_COUNT):
-            row_end = min(row_start + COLS_COUNT, total_in_case)
-            
-            # 创建 10 列
-            cols = st.columns(COLS_COUNT, gap="small")
-            
-            for col_idx in range(row_end - row_start):
-                sub_idx = row_start + col_idx
-                q = case_group[sub_idx]
-                q_id = q.get("id")
-                is_answered = q_id in st.session_state.answers
-                is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
-                is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
-                
-                with cols[col_idx]:
-                    # 按钮标签
-                    if is_correct:
-                        btn_label = "✅"
-                    elif is_answered:
-                        btn_label = "❌"
-                    else:
-                        btn_label = f"{sub_idx + 1}"
-                    
-                    # 按钮类型
-                    if is_current or is_correct:
-                        btn_type = "primary"
-                    else:
-                        btn_type = "secondary"
-                    
-                    # 小正方形按钮
-                    if st.button(
-                        btn_label,
-                        key=f"nav_{case_idx}_{sub_idx}",
-                        type=btn_type,
-                        use_container_width=True,
-                        help=f"案例{case_num}-小题{sub_idx+1}"
-                    ):
-                        st.session_state.current_index = case_idx
-                        st.session_state.sub_current_index = sub_idx
-                        st.session_state.show_result = False
-                        st.rerun()
-        
-        st.markdown("")  # 案例间分隔
-    
-    # 重新开始按钮
-    st.markdown("---")
-    if st.button("🔁 从头开始", use_container_width=True, key="restart_practice"):
-        st.session_state.answers = {}
-        st.session_state.current_index = 0
-        st.session_state.sub_current_index = 0
-        st.session_state.show_result = False
-        st.rerun()
     
     # 主答题区域
     with st.container():
