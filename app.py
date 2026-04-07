@@ -386,47 +386,103 @@ elif st.session_state.mode == "practice":
     progress = (completed_total + 1) / total_questions if total_questions > 0 else 0
     st.progress(progress)
     
-    # 题目概览 - 右上角悬浮面板（10 列网格）
+    # 题目概览 - 右上角固定悬浮面板（10 列网格）
     st.markdown("""
     <style>
-    /* 固定悬浮面板 */
-    div.question-nav-container {
-        position: fixed;
-        top: 70px;
-        right: 15px;
-        width: 380px;
-        max-height: 85vh;
-        overflow-y: auto;
-        background: white;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 999;
+    /* 固定悬浮面板 - 右上角 */
+    .question-nav-panel {
+        position: fixed !important;
+        top: 80px !important;
+        right: 20px !important;
+        width: 400px !important;
+        max-height: 85vh !important;
+        overflow-y: auto !important;
+        background: white !important;
+        border: 1px solid #ddd !important;
+        border-radius: 8px !important;
+        padding: 15px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+        z-index: 9999 !important;
     }
-    /* 10 列网格 */
-    div.question-grid-row {
-        display: grid;
-        grid-template-columns: repeat(10, 1fr);
-        gap: 4px;
-        margin-bottom: 6px;
+    
+    /* 10 列网格布局 */
+    .question-grid {
+        display: grid !important;
+        grid-template-columns: repeat(10, 1fr) !important;
+        grid-gap: 5px !important;
+        margin-bottom: 10px !important;
     }
-    /* 小正方形按钮 */
-    div.question-grid-row button {
-        width: 100% !important;
-        min-width: 28px !important;
-        height: 28px !important;
-        max-width: 28px !important;
+    
+    /* 小正方形按钮样式 */
+    .q-nav-btn {
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+        max-width: 32px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
         padding: 0 !important;
-        font-size: 10px !important;
-        border-radius: 4px !important;
+        font-size: 12px !important;
+        border-radius: 5px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        border: 1px solid #ccc !important;
+        transition: all 0.2s !important;
     }
+    
+    .q-nav-btn:hover {
+        transform: scale(1.15) !important;
+    }
+    
+    /* 状态颜色 */
+    .q-nav-btn.current {
+        background: #0068c9 !important;
+        color: white !important;
+        border-color: #0068c9 !important;
+    }
+    
+    .q-nav-btn.correct {
+        background: #28a745 !important;
+        color: white !important;
+        border-color: #28a745 !important;
+    }
+    
+    .q-nav-btn.wrong {
+        background: #dc3545 !important;
+        color: white !important;
+        border-color: #dc3545 !important;
+    }
+    
+    .q-nav-btn.default {
+        background: #f8f9fa !important;
+        color: #333 !important;
+        border-color: #ddd !important;
+    }
+    
     /* 案例标签 */
-    div.case-nav-label {
-        font-size: 11px;
-        font-weight: 600;
-        color: #666;
-        margin: 8px 0 4px 0;
+    .case-label {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        color: #666 !important;
+        margin: 10px 0 6px 0 !important;
+    }
+    
+    /* 重启按钮 */
+    .restart-nav-btn {
+        width: 100% !important;
+        padding: 10px !important;
+        margin-top: 12px !important;
+        background: #f0f0f0 !important;
+        border: 1px solid #ddd !important;
+        border-radius: 5px !important;
+        cursor: pointer !important;
+        font-size: 13px !important;
+    }
+    
+    .restart-nav-btn:hover {
+        background: #e0e0e0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -701,12 +757,13 @@ elif st.session_state.mode == "practice":
                 st.session_state.show_result = False
                 st.rerun()
     
-    # 悬浮题目面板 - 右上角固定位置（10 列网格）
-    # 使用固定定位的 container
-    st.markdown('<div class="question-nav-container">', unsafe_allow_html=True)
-    st.markdown('<div style="font-weight:600; font-size:13px; margin-bottom:10px; color:#333;">📋 题目导航</div>', unsafe_allow_html=True)
+    # 悬浮题目面板 - 右上角固定位置（纯 HTML 10 列网格）
+    # 构建完整的 HTML 导航面板
+    nav_html = '<div class="question-nav-panel">'
+    nav_html += '<div style="font-weight:600; font-size:14px; margin-bottom:12px; color:#333;">📋 题目导航</div>'
     
-    COLS_COUNT = 10
+    # 全局题目计数器
+    global_q_idx = 0
     
     for case_idx, case_group in enumerate(st.session_state.case_groups):
         case_num = case_idx + 1
@@ -716,61 +773,92 @@ elif st.session_state.mode == "practice":
         total_in_case = len(case_group)
         
         # 案例标签
-        st.markdown(f'<div class="case-nav-label">📍 案例{case_num} ({answered_in_case}/{total_in_case})</div>', unsafe_allow_html=True)
+        nav_html += f'<div class="case-label">📍 案例{case_num} ({answered_in_case}/{total_in_case})</div>'
         
-        # 按 10 列分组显示
-        for row_start in range(0, total_in_case, COLS_COUNT):
-            row_end = min(row_start + COLS_COUNT, total_in_case)
+        # 10 列网格
+        nav_html += '<div class="question-grid">'
+        
+        for sub_idx, q in enumerate(case_group):
+            q_id = q.get("id")
+            is_answered = q_id in st.session_state.answers
+            is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
+            is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
             
-            # 创建 10 列
-            cols = st.columns(COLS_COUNT, gap="small")
+            # 确定按钮样式和标签
+            if is_current:
+                btn_class = "current"
+                btn_label = f"{global_q_idx + 1}"
+            elif is_correct:
+                btn_class = "correct"
+                btn_label = "✓"
+            elif is_answered:
+                btn_class = "wrong"
+                btn_label = "✗"
+            else:
+                btn_class = "default"
+                btn_label = f"{global_q_idx + 1}"
             
-            for col_idx in range(row_end - row_start):
-                sub_idx = row_start + col_idx
-                q = case_group[sub_idx]
-                q_id = q.get("id")
-                is_answered = q_id in st.session_state.answers
-                is_correct = st.session_state.answers.get(q_id, {}).get("is_correct", False) if is_answered else False
-                is_current = (case_idx == current_case_idx and sub_idx == current_sub_idx)
-                
-                with cols[col_idx]:
-                    # 按钮标签
-                    if is_correct:
-                        btn_label = "✅"
-                    elif is_answered:
-                        btn_label = "❌"
-                    else:
-                        btn_label = f"{sub_idx + 1}"
-                    
-                    # 按钮类型
-                    if is_current or is_correct:
-                        btn_type = "primary"
-                    else:
-                        btn_type = "secondary"
-                    
-                    # 小正方形按钮
-                    if st.button(
-                        btn_label,
-                        key=f"nav_{case_idx}_{sub_idx}",
-                        type=btn_type,
-                        use_container_width=True,
-                        help=f"案例{case_num}-小题{sub_idx+1}"
-                    ):
-                        st.session_state.current_index = case_idx
-                        st.session_state.sub_current_index = sub_idx
-                        st.session_state.show_result = False
-                        st.rerun()
+            # 创建可点击的按钮 HTML
+            nav_html += f'''
+            <button class="q-nav-btn {btn_class}" 
+                    onclick="navigateToQuestion({case_idx},{sub_idx})"
+                    title="案例{case_num}-小题{sub_idx+1}">
+                {btn_label}
+            </button>
+            '''
+            
+            global_q_idx += 1
+        
+        nav_html += '</div>'  # 结束 question-grid
     
     # 重新开始按钮
-    st.markdown('<div style="margin-top:10px; padding-top:8px; border-top:1px solid #eee;">', unsafe_allow_html=True)
-    if st.button("🔁 从头开始", use_container_width=True, key="restart_practice"):
+    nav_html += '<button class="restart-nav-btn" onclick="restartPractice()">🔁 从头开始</button>'
+    nav_html += '</div>'  # 结束 question-nav-panel
+    
+    # 注入 HTML
+    st.markdown(nav_html, unsafe_allow_html=True)
+    
+    # JavaScript 处理点击导航
+    st.markdown("""
+    <script>
+    function navigateToQuestion(caseIdx, subIdx) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('nav_case', caseIdx);
+        url.searchParams.set('nav_sub', subIdx);
+        window.history.pushState({}, '', url);
+        window.location.reload();
+    }
+    
+    function restartPractice() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('restart', '1');
+        window.history.pushState({}, '', url);
+        window.location.reload();
+    }
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # 处理导航点击（通过 URL 参数）
+    query_params = st.query_params
+    if "nav_case" in query_params and "nav_sub" in query_params:
+        try:
+            new_case_idx = int(query_params["nav_case"])
+            new_sub_idx = int(query_params["nav_sub"])
+            st.session_state.current_index = new_case_idx
+            st.session_state.sub_current_index = new_sub_idx
+            st.session_state.show_result = False
+            st.query_params.clear()
+            st.rerun()
+        except (ValueError, KeyError):
+            pass
+    
+    if "restart" in query_params:
         st.session_state.answers = {}
         st.session_state.current_index = 0
         st.session_state.sub_current_index = 0
         st.session_state.show_result = False
+        st.query_params.clear()
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============== 页面：错题集 ==============
