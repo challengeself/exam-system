@@ -198,8 +198,17 @@ with st.sidebar:
     elif menu == "📊 统计":
         st.session_state.mode = "stats"
     
-    # 题目导航 - 左侧栏多行多列（仅在答题页面显示）
+    # 当前题库信息
+    if st.session_state.questions:
+        st.info(f"✅ 已加载 {len(st.session_state.questions)} 道题")
+        if st.session_state.current_library:
+            st.caption(f"📁 题库：{st.session_state.current_library}")
+    else:
+        st.warning("⚠️ 请先导入题库")
+    
+    # 题目导航 - 左侧栏底部多行多列（仅在答题页面显示）
     if st.session_state.mode == "practice" and st.session_state.questions:
+        st.markdown("---")
         st.markdown("**📋 题目导航**")
         
         COLS_COUNT = 10  # 每行 10 列
@@ -268,16 +277,6 @@ with st.sidebar:
             st.session_state.sub_current_index = 0
             st.session_state.show_result = False
             st.rerun()
-        
-        st.markdown("---")
-    
-    # 当前题库信息
-    if st.session_state.questions:
-        st.info(f"✅ 已加载 {len(st.session_state.questions)} 道题")
-        if st.session_state.current_library:
-            st.caption(f"📁 题库：{st.session_state.current_library}")
-    else:
-        st.warning("⚠️ 请先导入题库")
 
 
 # ============== 页面：题库管理 ==============
