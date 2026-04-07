@@ -434,6 +434,7 @@ elif st.session_state.mode == "practice":
     
     .q-nav-btn:hover {
         transform: scale(1.15) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
     }
     
     /* 状态颜色 */
@@ -479,6 +480,8 @@ elif st.session_state.mode == "practice":
         border-radius: 5px !important;
         cursor: pointer !important;
         font-size: 13px !important;
+        text-align: center !important;
+        display: block !important;
     }
     
     .restart-nav-btn:hover {
@@ -798,13 +801,14 @@ elif st.session_state.mode == "practice":
                 btn_class = "default"
                 btn_label = f"{global_q_idx + 1}"
             
-            # 创建可点击的按钮 HTML
+            # 创建可点击的按钮 HTML（使用 div 避免被 Streamlit 转换）
             nav_html += f'''
-            <button class="q-nav-btn {btn_class}" 
-                    onclick="navigateToQuestion({case_idx},{sub_idx})"
-                    title="案例{case_num}-小题{sub_idx+1}">
+            <div class="q-nav-btn {btn_class}" 
+                 onclick="navigateToQuestion({case_idx},{sub_idx})"
+                 title="案例{case_num}-小题{sub_idx+1}"
+                 style="cursor:pointer;">
                 {btn_label}
-            </button>
+            </div>
             '''
             
             global_q_idx += 1
@@ -812,7 +816,7 @@ elif st.session_state.mode == "practice":
         nav_html += '</div>'  # 结束 question-grid
     
     # 重新开始按钮
-    nav_html += '<button class="restart-nav-btn" onclick="restartPractice()">🔁 从头开始</button>'
+    nav_html += '<div class="restart-nav-btn" onclick="restartPractice()">🔁 从头开始</div>'
     nav_html += '</div>'  # 结束 question-nav-panel
     
     # 注入 HTML
